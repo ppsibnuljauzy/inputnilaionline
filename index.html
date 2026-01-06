@@ -371,6 +371,9 @@ button:disabled {
 </style>
 </head>
 <body>
+  <h2>Login dengan Google</h2>
+  <button id="loginBtn">Login dengan Google</button>
+  <p id="status"></p>
 <div class="container">
   <header>
     <h1>Aplikasi Input Nilai — UH / PTS / PAS</h1>
@@ -422,7 +425,10 @@ button:disabled {
 
 <!-- SheetJS for Excel parsing -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.24.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.24.0/firebase-auth-compat.js"></script>
+  <script src="app.js"></script>
 <script type="module">
 // ====== FIREBASE INIT ======
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
@@ -430,22 +436,26 @@ import { getFirestore, collection, doc, addDoc, getDocs, updateDoc, deleteDoc,
   onSnapshot, query, orderBy, serverTimestamp, writeBatch, where 
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+import { getAuth, signInWithRedirect, GoogleAuthProvider } from "firebase/auth";
 
 /* === GANTI DENGAN FIREBASE CONFIG ANDA JIKA PERLU === */
 const firebaseConfig = {
-  apiKey: "AIzaSyB_HRFzuIj5WeOF_a3yY0vOvx3jQNjS4EY",
-  authDomain: "input-nilai-online-2-e50d4.firebaseapp.com",
-  projectId: "input-nilai-online-2-e50d4",
-  storageBucket: "input-nilai-online-2-e50d4.firebasestorage.app",
-  messagingSenderId: "110769709524",
-  appId: "1:110769709524:web:cda4fb84e99e519de6b641",
-  measurementId: "G-DVB8PWYPND"
+  apiKey: "AIzaSyAgWrk-MjlQIsfF52UdgOGdccTlBk3ufbo",
+  authDomain: "input-nilai-online.firebaseapp.com",
+  projectId: "input-nilai-online",
+  storageBucket: "input-nilai-online.firebasestorage.app",
+  messagingSenderId: "191547680165",
+  appId: "1:191547680165:web:538040330e7b7e538a744c"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+import { getAuth, signInWithRedirect, GoogleAuthProvider } from "firebase/auth";
+
 const auth = getAuth();
+const provider = new GoogleAuthProvider();
+signInWithRedirect(auth, provider);
+
 
 const santriCol = collection(db,'santri');
 const mapelCol  = collection(db,'mapel');
@@ -454,27 +464,49 @@ const guruCol = collection(db, 'guru');
 let guruCache = [];
 
 // ====== DOM ======
-const mainPanel = document.getElementById('mainPanel');
-const transactionsPanel = document.getElementById('transactionsPanel');
-const transactionsFilter = document.getElementById('transactionsFilter');
-const userLabel = document.getElementById('userLabel');
+const loadingScreen = document.getElementById('loadingScreen');
+const loginScreen = document.getElementById('loginScreen');
+const mainContent = document.getElementById('mainContent');
 const btnLogin = document.getElementById('btnLogin');
 const btnLogout = document.getElementById('btnLogout');
-const mainContent = document.getElementById("mainContent");
-const loginScreen = document.getElementById("loginScreen");
+const userLabel = document.getElementById('userLabel');
+const status = document.getElementById('status');
 
-// ====== LOGIN ======
-btnLogin.addEventListener('click', async () => {
-  const provider = new GoogleAuthProvider();
-  try {
-    await signInWithPopup(auth, provider);
-  } catch(e) {
-    console.error(e);
-    alert('Login gagal: ' + (e.message || e));
-  }
+// 2️⃣ Event klik untuk login (popup aman)
+loginBtn.addEventListener("click", () => {
+  auth.signInWithRedirect(provider);
 });
 
-// ====== LOGOUT ======
+auth.getRedirectResult()
+  .then((result) => {
+    if (result.user) {
+      console.log("Login sukses:", result.user.displayName);
+      // redirect ke dashboard
+      // window.location.href = "dashboard.html";
+    }
+  })
+  .catch((error) => {
+    console.error("Login redirect error:", error);
+  });
+
+
+    .then((result) => {
+      const user = result.user;
+      status.textContent = `Login sukses! Halo, ${user.displayName}`;
+      console.log(user);
+    })
+    .catch((error) => {
+      console.error("Login gagal:", error);
+      if (error.code === 'auth/popup-blocked') {
+        status.textContent = "Popup diblokir! Coba klik login lagi atau gunakan browser lain.";
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        status.textContent = "Login dibatalkan. Coba lagi.";
+      } else {
+        status.textContent = "Login gagal: " + error.message;
+      }
+    });
+});
+
 btnLogout.addEventListener('click', () => signOut(auth));
 
 let activeTab = 'UH';
@@ -1986,31 +2018,20 @@ btnLogin.addEventListener('click', async ()=>{
 });
 btnLogout.addEventListener('click', ()=> signOut(auth));
 
+
 onAuthStateChanged(auth, async user => {
-if(user){
-  const docRef = doc(db, "users", user.uid);
-  const docSnap = await getDoc(docRef);
-  if(docSnap.exists()){
-    // baru tampilkan data
+  loadingScreen.style.display = 'none'; // loading selesai
+
+  if(user){
+    loginScreen.style.display = 'none';
+    mainContent.style.display = 'block';
+    userLabel.innerText = user.displayName || user.email;
+  } else {
+    loginScreen.style.display = 'block';
+    mainContent.style.display = 'none';
   }
-}
+});
 
-
-        // Tampilkan konten utama
-        loginScreen.style.display = "none";
-        mainContent.style.display = "block";
-        userLabel.innerText = user.displayName || user.email;
-        btnLogin.style.display = "none";
-        btnLogout.style.display = "inline-block";
-      } else {
-        // Tampilkan layar login
-        loginScreen.style.display = "block";
-        mainContent.style.display = "none";
-        userLabel.innerText = "Offline";
-        btnLogin.style.display = "inline-block";
-        btnLogout.style.display = "none";
-      }
-    });
 // initial render
 renderActiveTab();
 renderTransactionsWith(window._latestTx||[]);
