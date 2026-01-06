@@ -1987,17 +1987,14 @@ btnLogin.addEventListener('click', async ()=>{
 btnLogout.addEventListener('click', ()=> signOut(auth));
 
 onAuthStateChanged(auth, async user => {
-      if(user){
-        // Buat dokumen user di Firestore jika belum ada
-        const userRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(userRef);
-        if(!docSnap.exists()){
-          await setDoc(userRef, {
-            name: user.displayName || "",
-            email: user.email,
-            createdAt: new Date()
-          });
-        }
+if(user){
+  const docRef = doc(db, "users", user.uid);
+  const docSnap = await getDoc(docRef);
+  if(docSnap.exists()){
+    // baru tampilkan data
+  }
+}
+
 
         // Tampilkan konten utama
         loginScreen.style.display = "none";
