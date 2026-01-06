@@ -16,7 +16,7 @@
 body{margin:0;font-family:Arial;background:#0f172a;color:#e5e7eb}
 nav{background:#020617;padding:10px;display:flex;gap:8px}
 nav button{background:#1e293b;color:#fff;border:0;padding:8px 14px;cursor:pointer}
-nav button:hover{background:#334155}
+nav button:hover, nav button.active{background:#475569}
 .tab{display:none;padding:20px}
 .tab.active{display:block}
 input,select{padding:6px;margin:4px}
@@ -26,6 +26,7 @@ th,td{border:1px solid #334155;padding:6px;text-align:center}
 </head>
 
 <body>
+<div id="loading" style="padding:20px">⏳ Memuat aplikasi...</div>
 
 <nav id="nav"></nav>
 
@@ -84,28 +85,44 @@ firebase.initializeApp({
   projectId: "input-nilai-3",
 });
 
-const auth=firebase.auth();
-const db=firebase.firestore();
-let currentUser, guruMapel=[];
+const auth = firebase.auth();
+const db = firebase.firestore();
+let currentUser, guruMapel = [];
 
 // ================= LOGIN =================
-auth.onAuthStateChanged(async user=>{
+auth.onAuthStateChanged(async user => {
   if(!user){
+    loading.innerText = '🔐 Login Google...';
     auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
     return;
   }
-  currentUser=user;
-  const g=await db.collection('guru').doc(user.email).get();
-  if(!g.exists){alert('Guru belum terdaftar');return;}
-  guruMapel=g.data().mapel;
-  buildMenu();
-  await loadSiswa();
-  show('uh'); // ⬅️ WAJIB
+
+  currentUser = user;
+
+  try {
+    const g = await db.collection('guru').doc(user.email).get();
+    if(!g.exists){
+      loading.innerHTML = `
+        <h3>❌ Akses ditolak</h3>
+        <p>Email Anda belum terdaftar sebagai guru.</p>
+      `;
+      return;
+    }
+
+    guruMapel = g.data().mapel || [];
+    buildMenu();
+    await loadSiswa();
+    loading.remove();
+    show('uh'); // tampilkan tab UH pertama kali
+  } catch(err) {
+    loading.innerHTML = `<h3>❌ Error:</h3><pre>${err}</pre>`;
+    console.error(err);
+  }
 });
 
 // ================= MENU =================
 function buildMenu(){
-  nav.innerHTML='';
+  nav.innerHTML = '';
   addBtn('UH','uh');
   addBtn('PTS','pts');
   addBtn('PAS','pas');
@@ -113,9 +130,13 @@ function buildMenu(){
   addBtn('Rekap','rekap');
 }
 function addBtn(t,id){
-  let b=document.createElement('button');
-  b.textContent=t;
-  b.onclick=()=>show(id);
+  let b = document.createElement('button');
+  b.textContent = t;
+  b.onclick = () => {
+    show(id);
+    document.querySelectorAll('nav button').forEach(btn=>btn.classList.remove('active'));
+    b.classList.add('active');
+  }
   nav.appendChild(b);
 }
 function show(id){
@@ -126,20 +147,20 @@ function show(id){
 
 // ================= SISWA =================
 async function loadSiswa(){
-  const snap=await db.collection('siswa').get();
+  const snap = await db.collection('siswa').get();
   ['uhSiswa','ptsSiswa','pasSiswa'].forEach(id=>document.getElementById(id).innerHTML='');
   snap.forEach(d=>{
     ['uhSiswa','ptsSiswa','pasSiswa'].forEach(id=>{
-      let o=document.createElement('option');
-      o.value=d.id; o.text=d.data().nama;
+      let o = document.createElement('option');
+      o.value = d.id; o.text = d.data().nama;
       document.getElementById(id).appendChild(o);
     });
   });
   ['uhMapel','ptsMapel','pasMapel'].forEach(id=>{
     document.getElementById(id).innerHTML='';
     guruMapel.forEach(m=>{
-      let o=document.createElement('option');
-      o.value=m;o.text=m;
+      let o = document.createElement('option');
+      o.value = m; o.text = m;
       document.getElementById(id).appendChild(o);
     });
   });
@@ -147,51 +168,64 @@ async function loadSiswa(){
 
 // ================= SIMPAN =================
 async function simpan(jenis){
-  const mapel=document.getElementById(jenis.toLowerCase()+'Mapel').value;
-  const siswaId=document.getElementById(jenis.toLowerCase()+'Siswa').value;
-  const nilai=Number(document.getElementById(jenis.toLowerCase()+'Nilai').value);
+  const mapel = document.getElementById(jenis.toLowerCase()+'Mapel').value;
+  const siswaId = document.getElementById(jenis.toLowerCase()+'Siswa').value;
+  const nilai = Number(document.getElementById(jenis.toLowerCase()+'Nilai').value);
   await db.collection('nilai').add({jenis,mapel,siswaId,nilai});
-  hitungRekap(siswaId,mapel);
+  await hitungRekap(siswaId,mapel);
 }
 
 async function simpanPAS(){
-  await db.collection('nilai').add({
-    jenis:pasJenis.value,
-    mapel:pasMapel.value,
-    siswaId:pasSiswa.value,
-    nilai:Number(pasNilai.value)
-  });
-  hitungRekap(pasSiswa.value,pasMapel.value);
+  const jenis = pasJenis.value;
+  const mapel = pasMapel.value;
+  const siswaId = pasSiswa.value;
+  const nilai = Number(pasNilai.value);
+  await db.collection('nilai').add({jenis,mapel,siswaId,nilai});
+  await hitungRekap(siswaId,mapel);
 }
 
-// ================= IMPORT =================
+// ================= IMPORT SISWA =================
 async function importSiswa(e){
-  const wb=XLSX.read(await e.target.files[0].arrayBuffer());
-  const data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+  const wb = XLSX.read(await e.target.files[0].arrayBuffer());
+  const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
   for(let s of data){
-    await db.collection('siswa').add({nisn:s.NISN,nama:s.NAMA,kelas:s.KELAS});
+    await db.collection('siswa').add({
+      nisn: s.NISN || s.nisn,
+      nama: s.NAMA || s.nama,
+      kelas: s.KELAS || s.kelas
+    });
   }
-  alert('Import selesai'); loadSiswa();
+  alert('Import selesai');
+  await loadSiswa();
 }
 
 // ================= REKAP =================
 async function hitungRekap(siswaId,mapel){
-  const q=await db.collection('nilai').where('siswaId','==',siswaId).where('mapel','==',mapel).get();
-  let r={UH:0,PTS:0,PAS_LISAN:0,PAS_TULIS:0,PAS_PRAKTEK:0};
-  q.forEach(d=>r[d.data().jenis]=d.data().nilai);
-  let pas=(r.PAS_LISAN+r.PAS_TULIS+r.PAS_PRAKTEK)/3;
-  let na=(r.UH*0.2)+(r.PTS*0.3)+(pas*0.5);
-  await db.collection('rekap').doc(siswaId+'_'+mapel).set({...r,na,mapel,siswaId});
+  const q = await db.collection('nilai').where('siswaId','==',siswaId).where('mapel','==',mapel).get();
+  let r = {UH:0,PTS:0,PAS_LISAN:0,PAS_TULIS:0,PAS_PRAKTEK:0};
+  q.forEach(d=>r[d.data().jenis] = d.data().nilai || 0);
+  let pas = (r.PAS_LISAN + r.PAS_TULIS + r.PAS_PRAKTEK)/3;
+  let na = (r.UH*0.2)+(r.PTS*0.3)+(pas*0.5);
+  await db.collection('rekap').doc(siswaId+'_'+mapel).set({
+    UH: r.UH,
+    PTS: r.PTS,
+    PAS_LISAN: r.PAS_LISAN,
+    PAS_TULIS: r.PAS_TULIS,
+    PAS_PRAKTEK: r.PAS_PRAKTEK,
+    na: na,
+    mapel: mapel,
+    siswaId: siswaId
+  });
 }
 
 async function loadRekap(){
   rekapBody.innerHTML='';
-  const siswaSnap=await db.collection('siswa').get();
-  let sm={}; siswaSnap.forEach(d=>sm[d.id]=d.data().nama);
-  const snap=await db.collection('rekap').get();
+  const siswaSnap = await db.collection('siswa').get();
+  let sm = {}; siswaSnap.forEach(d=>sm[d.id]=d.data().nama);
+  const snap = await db.collection('rekap').get();
   snap.forEach(d=>{
-    let r=d.data();
-    rekapBody.innerHTML+=`
+    let r = d.data();
+    rekapBody.innerHTML += `
     <tr>
       <td>${sm[r.siswaId]}</td>
       <td>${r.mapel}</td>
