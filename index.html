@@ -367,22 +367,41 @@ button:disabled {
   opacity:.5;
   cursor:not-allowed;
 }
+.table-responsive {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+/* Sembunyikan konten jika belum login */
+#mainContent {
+  display: none;
+}
 
+/* Sembunyikan tombol login/logout sesuai status */
+.hidden {
+  display: none !important;
+}
 </style>
 </head>
 <body>
-  <h2>Login dengan Google</h2>
-  <button id="loginBtn">Login dengan Google</button>
-  <p id="status"></p>
 <div class="container">
-  <header>
-    <h1>Aplikasi Input Nilai — UH / PTS / PAS</h1>
-    <div class="auth-area">
-      <div id="userLabel">Offline</div>
-      <button class="btn small" id="btnLogin">Login (Google)</button>
-      <button class="btn small ghost" id="btnLogout" style="display:none">Logout</button>
-    </div>
-  </header>
+<header>
+  <h1>Aplikasi Input Nilai</h1>
+  <div class="auth-area">
+    <div id="userLabel">Memuat...</div>
+    <button class="btn small" id="btnLogin">Login (Google)</button>
+    <button class="btn small ghost" id="btnLogout" style="display:none">Logout</button>
+  </div>
+</header>
+
+<div id="mainContent" class="container">
+   </div>
+
+<div id="loginPrompt" style="text-align:center; margin-top:100px;">
+  <h2>Silahkan Login untuk Mengakses Aplikasi</h2>
+  <p>Gunakan akun Google sekolah Anda.</p>
+</div>
 
   <div class="card">
     <div class="tabs" id="tabs">
@@ -425,10 +444,7 @@ button:disabled {
 
 <!-- SheetJS for Excel parsing -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.24.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.24.0/firebase-auth-compat.js"></script>
-  <script src="app.js"></script>
+
 <script type="module">
 // ====== FIREBASE INIT ======
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
@@ -436,26 +452,22 @@ import { getFirestore, collection, doc, addDoc, getDocs, updateDoc, deleteDoc,
   onSnapshot, query, orderBy, serverTimestamp, writeBatch, where 
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-import { getAuth, signInWithRedirect, GoogleAuthProvider } from "firebase/auth";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 
 /* === GANTI DENGAN FIREBASE CONFIG ANDA JIKA PERLU === */
 const firebaseConfig = {
-  apiKey: "AIzaSyAgWrk-MjlQIsfF52UdgOGdccTlBk3ufbo",
-  authDomain: "input-nilai-online.firebaseapp.com",
-  projectId: "input-nilai-online",
-  storageBucket: "input-nilai-online.firebasestorage.app",
-  messagingSenderId: "191547680165",
-  appId: "1:191547680165:web:538040330e7b7e538a744c"
+  apiKey: "AIzaSyB_HRFzuIj5WeOF_a3yY0vOvx3jQNjS4EY",
+  authDomain: "input-nilai-online-2-e50d4.firebaseapp.com",
+  projectId: "input-nilai-online-2-e50d4",
+  storageBucket: "input-nilai-online-2-e50d4.firebasestorage.app",
+  messagingSenderId: "110769709524",
+  appId: "1:110769709524:web:cda4fb84e99e519de6b641",
+  measurementId: "G-DVB8PWYPND"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-import { getAuth, signInWithRedirect, GoogleAuthProvider } from "firebase/auth";
-
 const auth = getAuth();
-const provider = new GoogleAuthProvider();
-signInWithRedirect(auth, provider);
-
 
 const santriCol = collection(db,'santri');
 const mapelCol  = collection(db,'mapel');
@@ -464,50 +476,12 @@ const guruCol = collection(db, 'guru');
 let guruCache = [];
 
 // ====== DOM ======
-const loadingScreen = document.getElementById('loadingScreen');
-const loginScreen = document.getElementById('loginScreen');
-const mainContent = document.getElementById('mainContent');
+const mainPanel = document.getElementById('mainPanel');
+const transactionsPanel = document.getElementById('transactionsPanel');
+const transactionsFilter = document.getElementById('transactionsFilter');
+const userLabel = document.getElementById('userLabel');
 const btnLogin = document.getElementById('btnLogin');
 const btnLogout = document.getElementById('btnLogout');
-const userLabel = document.getElementById('userLabel');
-const status = document.getElementById('status');
-
-// 2️⃣ Event klik untuk login (popup aman)
-loginBtn.addEventListener("click", () => {
-  auth.signInWithRedirect(provider);
-});
-
-auth.getRedirectResult()
-  .then((result) => {
-    if (result.user) {
-      console.log("Login sukses:", result.user.displayName);
-      // redirect ke dashboard
-      // window.location.href = "dashboard.html";
-    }
-  })
-  .catch((error) => {
-    console.error("Login redirect error:", error);
-  });
-
-
-    .then((result) => {
-      const user = result.user;
-      status.textContent = `Login sukses! Halo, ${user.displayName}`;
-      console.log(user);
-    })
-    .catch((error) => {
-      console.error("Login gagal:", error);
-      if (error.code === 'auth/popup-blocked') {
-        status.textContent = "Popup diblokir! Coba klik login lagi atau gunakan browser lain.";
-      } else if (error.code === 'auth/cancelled-popup-request') {
-        status.textContent = "Login dibatalkan. Coba lagi.";
-      } else {
-        status.textContent = "Login gagal: " + error.message;
-      }
-    });
-});
-
-btnLogout.addEventListener('click', () => signOut(auth));
 
 let activeTab = 'UH';
 let santriCache = [];
@@ -2018,17 +1992,50 @@ btnLogin.addEventListener('click', async ()=>{
 });
 btnLogout.addEventListener('click', ()=> signOut(auth));
 
+onAuthStateChanged(auth, user=>{
+  if(user){ userLabel.innerText = user.displayName || user.email; btnLogin.style.display='none'; btnLogout.style.display='inline-block'; }
+  else { userLabel.innerText = 'Offline'; btnLogin.style.display='inline-block'; btnLogout.style.display='none'; }
+});
 
-onAuthStateChanged(auth, async user => {
-  loadingScreen.style.display = 'none'; // loading selesai
+// === LOGIKA LOGIN ===
+const googleProvider = new GoogleAuthProvider();
 
-  if(user){
-    loginScreen.style.display = 'none';
-    mainContent.style.display = 'block';
-    userLabel.innerText = user.displayName || user.email;
+btnLogin.onclick = () => {
+  signInWithPopup(auth, googleProvider)
+    .then(() => console.log("Login Berhasil"))
+    .catch((err) => alert("Gagal Login: " + err.message));
+};
+
+btnLogout.onclick = () => {
+  signOut(auth).then(() => {
+    location.reload(); // Segarkan halaman saat logout
+  });
+};
+
+// === AUTH GUARD (Paling Penting) ===
+onAuthStateChanged(auth, (user) => {
+  const mainContent = document.getElementById('mainContent');
+  const loginPrompt = document.getElementById('loginPrompt');
+
+  if (user) {
+    // Jika User Login
+    userLabel.innerText = "Halo, " + user.displayName;
+    btnLogin.style.display = 'none';
+    btnLogout.style.display = 'block';
+    
+    mainContent.style.display = 'block'; // Tampilkan aplikasi
+    loginPrompt.style.display = 'none';  // Sembunyikan pesan login
+    
+    // Jalankan inisialisasi data di sini jika diperlukan
+    renderActiveTab(); 
   } else {
-    loginScreen.style.display = 'block';
-    mainContent.style.display = 'none';
+    // Jika User Logout
+    userLabel.innerText = "Offline";
+    btnLogin.style.display = 'block';
+    btnLogout.style.display = 'none';
+    
+    mainContent.style.display = 'none'; // Sembunyikan aplikasi
+    loginPrompt.style.display = 'block'; // Tampilkan pesan login
   }
 });
 
