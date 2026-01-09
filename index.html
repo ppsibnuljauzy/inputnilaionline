@@ -3,74 +3,421 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Aplikasi Input Nilai — Firestore (Secure)</title>
+<title>Aplikasi Input Nilai — Firestore (Mobile Friendly)</title>
 <style>
-/* ... (Gunakan CSS Anda yang sudah ada di sini) ... */
-:root { --bg: #f8fafc; --card: #ffffff; --primary: #06b6d4; --primary-dark: #0284c7; --muted: #64748b; --radius: 16px; --radius-sm: 10px; }
-* { box-sizing: border-box; font-family: Inter, sans-serif; transition: all .2s ease; }
-body { margin: 0; background: linear-gradient(180deg,#f0f4f8,#ffffff); color: #222; font-size: 15px; }
-.container { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px; padding: 15px 0; border-bottom: 1px solid #eee; }
-.auth-area { display:flex; gap:8px; align-items:center; }
-.card, .panel { background: var(--card); border-radius: var(--radius); padding: 16px; border:1px solid rgba(0,0,0,.06); box-shadow: 0 8px 24px rgba(0,0,0,.06); }
-.tabs { display:flex; gap:6px; padding:6px; background:#e0f2fe; border-radius:16px; overflow-x:auto; margin-bottom:12px; }
-.tab { padding:8px 16px; border-radius:14px; cursor:pointer; font-weight:600; color:var(--primary-dark); background:rgba(255,255,255,0.6); white-space:nowrap; }
-.tab.active { background:linear-gradient(135deg,var(--primary),var(--primary-dark)); color:#fff; }
-.grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-.btn { display:inline-flex; align-items:center; justify-content:center; padding:10px 16px; border-radius:var(--radius-sm); border:none; cursor:pointer; font-weight:600; color:#fff; background:linear-gradient(135deg,var(--primary),var(--primary-dark)); }
-.btn.ghost { background:#f1f5f9; color:var(--muted); border:1px solid #cbd5e1; }
-@media(max-width:900px){ .grid { grid-template-columns:1fr; } }
-/* Utility Classes */
-.hidden { display: none !important; }
+/* =========================
+   ROOT THEME
+========================= */
+:root {
+  --bg: #f8fafc;
+  --card: #ffffff;
+
+  --primary: #06b6d4;
+  --primary-dark: #0284c7;
+  --primary-soft: #e0f7ff;
+
+  --danger: #ef4444;
+  --danger-dark: #dc2626;
+
+  --muted: #64748b;
+
+  --radius: 16px;
+  --radius-sm: 10px;
+
+  --shadow-sm: 0 2px 6px rgba(0,0,0,.06);
+  --shadow-md: 0 8px 24px rgba(0,0,0,.08);
+}
+
+/* =========================
+   GLOBAL RESET
+========================= */
+* {
+  box-sizing: border-box;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  transition: background-color .2s ease,
+              color .2s ease,
+              box-shadow .2s ease,
+              transform .2s ease;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(180deg,#f0f4f8,#ffffff);
+  color: #222;
+  font-size: 15px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  background: linear-gradient(135deg,var(--primary-dark),var(--primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* =========================
+   HEADER
+========================= */
+header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:16px;
+  flex-wrap:wrap;
+  gap:8px;
+}
+
+.auth-area {
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+
+/* =========================
+   CARD & PANEL (SOFT BORDER)
+========================= */
+.card,
+.panel {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 16px;
+  border:1px solid rgba(0,0,0,.06);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,.04),
+    0 8px 24px rgba(0,0,0,.06);
+}
+
+.panel {
+  background: linear-gradient(180deg,#ffffff,#f8fafc);
+}
+
+.panel:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* =========================
+   TABS (SMOOTH & ELEGANT)
+========================= */
+.tabs {
+  display:flex;
+  gap:6px;
+  padding:6px;
+  background:linear-gradient(180deg,#e0f2fe,#f0f9ff);
+  border-radius:16px;
+  border:1px solid rgba(6,182,212,.25);
+  box-shadow: inset 0 1px 2px rgba(255,255,255,.6);
+  overflow-x:auto;
+  margin-bottom:12px;
+}
+
+.tab {
+  padding:8px 16px;
+  border-radius:14px;
+  cursor:pointer;
+  font-weight:600;
+  color:var(--primary-dark);
+  background:rgba(255,255,255,.6);
+  border:1px solid rgba(6,182,212,.15);
+  white-space:nowrap;
+  backdrop-filter: blur(4px);
+}
+
+.tab:hover {
+  background:var(--primary-soft);
+  border-color:rgba(6,182,212,.35);
+}
+
+.tab.active {
+  background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+  color:#fff;
+  border-color:transparent;
+  box-shadow:0 6px 16px rgba(6,182,212,.45);
+}
+
+/* =========================
+   GRID
+========================= */
+.grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+  justify-items:center;
+}
+
+/* =========================
+   FORM
+========================= */
+label {
+  display:block;
+  font-size:13px;
+  color:var(--muted);
+  margin-bottom:6px;
+}
+
+input[type=text],
+input[type=number],
+select {
+  width:100%;
+  padding:10px;
+  border-radius:var(--radius-sm);
+  border:1px solid #ccc;
+}
+
+input:focus,
+select:focus {
+  outline:none;
+  border-color:var(--primary);
+  box-shadow:0 0 0 3px rgba(6,182,212,.25);
+}
+
+/* =========================
+   BUTTON SYSTEM
+========================= */
+.btn {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:10px 16px;
+  border-radius:var(--radius-sm);
+  border:none;
+  cursor:pointer;
+  font-weight:600;
+  color:#fff;
+  background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+  box-shadow:0 4px 12px rgba(6,182,212,.35);
+}
+
+.btn:hover {
+  transform:translateY(-1px);
+  box-shadow:0 6px 16px rgba(6,182,212,.45);
+}
+
+.btn.small {
+  padding:6px 12px;
+  font-size:13px;
+}
+
+/* EDIT */
+.btn.edit,
+.btnEdit,
+.btnEditTx {
+  background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+  border:1px solid var(--primary-dark);
+}
+
+/* DELETE NORMAL */
+.btn.delete,
+.btnDel,
+.btnDelTx {
+  background:linear-gradient(135deg,var(--danger),var(--danger-dark));
+  border:1px solid var(--danger-dark);
+  box-shadow:0 3px 10px rgba(239,68,68,.35);
+}
+
+/* DELETE ALL (SUPER RED) */
+.btn.delete-all,
+.btn.hapus-semua {
+  background: linear-gradient(135deg,#ff4d4f,#dc2626);
+  border: 1px solid #b91c1c;
+  box-shadow:0 6px 18px rgba(239,68,68,.45);
+}
+
+.btn.delete-all:hover,
+.btn.hapus-semua:hover {
+  background: linear-gradient(135deg,#dc2626,#b91c1c);
+  transform:translateY(-1px) scale(1.02);
+  box-shadow:0 8px 24px rgba(239,68,68,.55);
+}
+
+/* GHOST */
+.btn.ghost {
+  background:#f1f5f9;
+  color:var(--muted);
+  box-shadow:none;
+  border:1px solid #cbd5e1;
+}
+
+.btn.ghost:hover {
+  background:var(--primary);
+  color:#fff;
+  border-color:var(--primary-dark);
+}
+
+/* =========================
+   SANTRI LIST
+========================= */
+.santri-list {
+  max-height:380px;
+  overflow:auto;
+  margin-top:10px;
+  padding:8px;
+  border-radius:12px;
+  border:1px dashed rgba(0,0,0,.1);
+  background:#fafafa;
+}
+
+.santri-row {
+  display:flex;
+  gap:12px;
+  align-items:center;
+  padding:8px;
+  border-radius:10px;
+}
+
+.santri-row:nth-child(odd) {
+  background:rgba(0,0,0,.02);
+}
+
+.santri-row:hover {
+  background:var(--primary-soft);
+}
+
+/* =========================
+   TABLE (SMOOTH & MODERN)
+========================= */
+.transactions {
+  margin-top:12px;
+  overflow-x:auto;
+  border-radius:14px;
+  border:1px solid rgba(0,0,0,.06);
+  box-shadow: var(--shadow-sm);
+}
+
+table {
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+  border-radius:14px;
+  overflow:hidden;
+}
+
+th, td {
+  padding:10px 12px;
+  font-size:13px;
+  border-bottom:1px solid rgba(0,0,0,.05);
+}
+
+th {
+  background:linear-gradient(180deg,#f8fafc,#f1f5f9);
+  color:var(--muted);
+  font-weight:700;
+}
+
+tbody tr:last-child td {
+  border-bottom:none;
+}
+
+tbody tr:hover {
+  background:rgba(6,182,212,.08);
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+@media(max-width:900px){
+  .grid {
+    grid-template-columns:1fr;
+  }
+  .panel {
+    width:100%;
+  }
+}
+
+@media(max-width:600px){
+  body { font-size:14px; padding:12px; }
+  h1 { font-size:18px; }
+
+  table, thead, tbody, th, td, tr {
+    display:block;
+    width:100%;
+  }
+
+  thead { display:none; }
+
+  tr {
+    margin-bottom:10px;
+    border-bottom:1px solid rgba(0,0,0,.1);
+  }
+
+  td {
+    display:flex;
+    justify-content:space-between;
+    padding:6px 8px;
+  }
+
+  td::before {
+    content:attr(data-label);
+    font-weight:600;
+    color:var(--muted);
+  }
+}
+
+button:disabled {
+  opacity:.5;
+  cursor:not-allowed;
+}
+.table-responsive {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
 </style>
 </head>
 <body>
 <div class="container">
   <header>
-    <h1>Aplikasi Input Nilai</h1>
+    <h1>Aplikasi Input Nilai — UH / PTS / PAS</h1>
     <div class="auth-area">
-      <div id="userLabel">Memuat...</div>
+      <div id="userLabel">Offline</div>
       <button class="btn small" id="btnLogin">Login (Google)</button>
       <button class="btn small ghost" id="btnLogout" style="display:none">Logout</button>
     </div>
   </header>
 
-  <div id="loginPrompt" style="text-align:center; margin-top:100px; display:none;">
-    <div class="card" style="max-width: 400px; margin: auto;">
-      <h2>Selamat Datang</h2>
-      <p>Silakan login untuk mengakses sistem input nilai.</p>
+  <div class="card" id="mainAppContent" style="display:none">
+    <div class="tabs" id="tabs">
+      <div class="tab active" data-tab="UH">INPUT UH</div>
+      <div class="tab" data-tab="PTS">INPUT PTS</div>
+      <div class="tab" data-tab="PAS">INPUT PAS</div>
+      <div class="tab" data-tab="DAFTAR_SANTRI">DAFTAR SANTRI</div>
+      <div class="tab" data-tab="DAFTAR_MAPEL">DAFTAR MAPEL</div>
+      <div class="tab" data-tab="DAFTAR_GURU">DAFTAR GURU</div>
+      <div class="tab" data-tab="REKAP_SISWA">REKAP PERSISWA</div>
+    </div>
+
+    <div class="grid">
+      <div class="panel" id="mainPanel"></div>
+
+
+      <!-- PANEL TABEL -->
+      <div class="panel" style="overflow:auto;">
+        <h3 style="margin-top:0">Tabel Transaksi Nilai</h3>
+        <div id="transactionsFilter"></div>
+        <div class="transactions card" id="transactionsPanel"></div>
+        <div class="footer-note">Data transaksi berisi semua nilai UH, PTS, PAS. Bisa edit/hapus. Disimpan di Firestore.</div>
+      </div>
     </div>
   </div>
 
-  <div id="mainContent" style="display:none;">
-    <div class="card">
-      <div class="tabs" id="tabs">
-        <div class="tab active" data-tab="UH">INPUT UH</div>
-        <div class="tab" data-tab="PTS">INPUT PTS</div>
-        <div class="tab" data-tab="PAS">INPUT PAS</div>
-        <div class="tab" data-tab="DAFTAR_SANTRI">DAFTAR SANTRI</div>
-        <div class="tab" data-tab="DAFTAR_MAPEL">DAFTAR MAPEL</div>
-        <div class="tab" data-tab="DAFTAR_GURU">DAFTAR GURU</div>
-        <div class="tab" data-tab="REKAP_SISWA">REKAP PERSISWA</div>
-      </div>
-
-      <div class="grid">
-        <div class="panel" id="mainPanel"></div>
-        <div class="panel" style="overflow:auto;">
-          <h3 style="margin-top:0">Tabel Transaksi Nilai</h3>
-          <div id="transactionsFilter"></div>
-          <div class="transactions card" id="transactionsPanel"></div>
-        </div>
-      </div>
-    </div>
-    
-    <div style="height:18px"></div>
-    <div style="color:var(--muted);font-size:13px">
-      Tips: Gunakan tab <strong>DAFTAR SANTRI</strong> untuk custom data.
-    </div>
+  <div style="height:18px"></div>
+  <div style="color:var(--muted);font-size:13px">
+    Tips: Gunakan tab <strong>DAFTAR SANTRI</strong> dan <strong>DAFTAR MAPEL</strong> untuk meng-custom nama santri & mapel. Perubahan langsung mempengaruhi dropdown dan daftar di tab nilai.
   </div>
 </div>
 
+<!-- Modal Preview Nilai -->
 <div id="previewModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;z-index:9999;">
   <div style="background:#fff;padding:16px;border-radius:12px;max-width:90%;max-height:80%;overflow:auto;position:relative;">
     <button id="closePreview" style="position:absolute;top:8px;right:8px;padding:4px 8px;border:none;background:#f00;color:#fff;border-radius:6px;cursor:pointer;">✕</button>
@@ -78,174 +425,288 @@ header { display:flex; justify-content:space-between; align-items:center; margin
   </div>
 </div>
 
+<!-- SheetJS for Excel parsing -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <script type="module">
+// ====== FIREBASE INIT ======
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-import { getFirestore, collection, doc, addDoc, getDocs, updateDoc, deleteDoc, onSnapshot, query, orderBy, serverTimestamp, writeBatch, where } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { getFirestore, collection, doc, addDoc, getDocs, updateDoc, deleteDoc, 
+  onSnapshot, query, orderBy, serverTimestamp, writeBatch, where 
+} from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyB_HRFzuIj5WeOF_a3yY0vOvx3jQNjS4EY",
-  authDomain: "input-nilai-online-2-e50d4.firebaseapp.com",
-  projectId: "input-nilai-online-2-e50d4",
-  storageBucket: "input-nilai-online-2-e50d4.firebasestorage.app",
-  messagingSenderId: "110769709524",
-  appId: "1:110769709524:web:cda4fb84e99e519de6b641"
+  apiKey: "AIzaSyC_5sI9JYaR-bbGWBQFvfl2SX1xe2WRPuE",
+  authDomain: "input-nilai-online-c4657.firebaseapp.com",
+  projectId: "input-nilai-online-c4657",
+  storageBucket: "input-nilai-online-c4657.firebasestorage.app",
+  messagingSenderId: "676655325666",
+  appId: "1:676655325666:web:0db190cedc613a165199bb",
+  measurementId: "G-XYMHEHR27B"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth();
-const googleProvider = new GoogleAuthProvider();
 
-// DOM Elements
+// Pantau status login secara realtime
+onAuthStateChanged(auth, (user) => {
+  const mainContent = document.querySelector('.card'); // Div utama aplikasi
+  const authArea = document.querySelector('.auth-area');
+
+  if (user) {
+    // JIKA USER SUDAH LOGIN
+    userLabel.innerText = "Halo, " + user.displayName;
+    btnLogin.style.display = 'none';
+    btnLogout.style.display = 'block';
+    mainContent.style.display = 'block'; // Tampilkan aplikasi
+    
+    console.log("User UID:", user.uid);
+  } else {
+    // JIKA USER BELUM LOGIN
+    userLabel.innerText = "Silakan Login";
+    btnLogin.style.display = 'block';
+    btnLogout.style.display = 'none';
+    mainContent.style.display = 'none'; // Sembunyikan aplikasi
+    
+    // Opsional: Jalankan login otomatis (popup) jika ingin langsung memaksa login
+    // loginGoogle(); 
+  }
+});
+
+// Fungsi Login
+async function loginGoogle() {
+  const provider = new GoogleAuthProvider();
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (error) {
+    console.error("Gagal Login:", error);
+    alert("Login gagal, silakan coba lagi.");
+  }
+}
+
+// Fungsi Logout
+btnLogout.addEventListener('click', () => {
+  signOut(auth).then(() => {
+    alert("Berhasil Logout");
+  });
+});
+
+btnLogin.addEventListener('click', loginGoogle);
+
+const santriCol = collection(db,'santri');
+const mapelCol  = collection(db,'mapel');
+const nilaiCol  = collection(db,'nilai');
+const guruCol = collection(db, 'guru');
+let guruCache = [];
+
+// ====== DOM ======
 const mainPanel = document.getElementById('mainPanel');
 const transactionsPanel = document.getElementById('transactionsPanel');
+const transactionsFilter = document.getElementById('transactionsFilter');
 const userLabel = document.getElementById('userLabel');
 const btnLogin = document.getElementById('btnLogin');
 const btnLogout = document.getElementById('btnLogout');
-const mainContent = document.getElementById('mainContent');
-const loginPrompt = document.getElementById('loginPrompt');
+
+// 1. Definisikan daftar email di awal script module
+const allowedEmails = [
+  "abunafshah@gmail.com" 
+];
+
+// 2. Pasang Listener Status Auth
+onAuthStateChanged(auth, (user) => {
+  const mainContent = document.getElementById('mainAppContent');
+
+  if (user) {
+    // CEK APAKAH EMAIL TERDAFTAR
+    if (allowedEmails.includes(user.email)) {
+      // JIKA TERDAFTAR: Izinkan masuk
+      userLabel.innerText = "Halo, " + user.displayName;
+      btnLogin.style.display = 'none';
+      btnLogout.style.display = 'block';
+      mainContent.style.display = 'block'; // Tampilkan konten aplikasi
+      
+      renderActiveTab(); // Jalankan fungsi aplikasi
+    } else {
+      // JIKA TIDAK TERDAFTAR: Beri peringatan dan Logout paksa
+      alert("Akses Ditolak!\nEmail (" + user.email + ") tidak terdaftar dalam sistem pengajar.");
+      signOut(auth); 
+    }
+  } else {
+    // JIKA USER SUDAH LOGOUT ATAU BELUM LOGIN
+    userLabel.innerText = "Silakan Login";
+    btnLogin.style.display = 'block';
+    btnLogout.style.display = 'none';
+    mainContent.style.display = 'none'; // Sembunyikan konten aplikasi
+  }
+});
 
 let activeTab = 'UH';
 let santriCache = [];
 let mapelCache = [];
-let guruCache = [];
 
-// ===============================
-// === 1. AUTH LOGIC (GATEKEEPER) ===
-// ===============================
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    userLabel.innerText = "Halo, " + user.displayName.split(' ')[0];
-    btnLogin.style.display = 'none';
-    btnLogout.style.display = 'block';
-    mainContent.style.display = 'block';
-    loginPrompt.style.display = 'none';
-    
-    initRealtimeData(); // Jalankan sync data jika login
-  } else {
-    userLabel.innerText = "Offline";
-    btnLogin.style.display = 'block';
-    btnLogout.style.display = 'none';
-    mainContent.style.display = 'none';
-    loginPrompt.style.display = 'block';
+// ====== HELPERS ======
+function escapeHtml(str){ if(!str) return ''; return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
+function fmtDate(ts){
+  try{ if(!ts) return ''; if(ts.toDate) return ts.toDate().toLocaleString(); return String(ts); }catch(e){ return ''; }
+}
+
+
+async function hapusDuplikatSantri(){
+  const map = {};
+  const batch = writeBatch(db);
+
+  santriCache.forEach(s=>{
+    if(!s.nisn) return;
+    if(map[s.nisn]){
+      batch.delete(doc(db,'santri',s.id));
+    } else {
+      map[s.nisn] = true;
+    }
+  });
+
+  await batch.commit();
+  alert('Duplikat santri berhasil dibersihkan');
+}
+
+
+
+// ====== REALTIME SNAPSHOTS ======
+onSnapshot(query(santriCol, orderBy('name')), snap=>{
+  santriCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
+
+  // 🔥 RESET filter santri jika sudah kosong
+  const santriSelect = document.getElementById('filterSantri');
+  if(santriSelect){
+    santriSelect.innerHTML = '<option value="">Semua Santri</option>';
+  }
+
+  renderActiveTab();
+  renderTransactionsWith(window._latestTx || []);
+});
+
+onSnapshot(query(mapelCol, orderBy('name')), snap=>{
+  mapelCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  renderActiveTab();
+  renderTransactionsWith(window._latestTx || []);
+});
+onSnapshot(query(nilaiCol, orderBy('createdAt','desc')), snap=>{
+  window._latestTx = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  // reset to page 1 when new live data comes in to avoid empty page issues
+  currentPage = 1;
+  renderTransactionsWith(window._latestTx);
+  if(activeTab==='REKAP_SISWA') renderRekapSiswa();
+});
+onSnapshot(query(guruCol, orderBy('name')), snap => {
+  guruCache = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+
+  // hanya render ulang jika tab guru sedang aktif
+  if (activeTab === 'DAFTAR_GURU') {
+    renderGuruEditor();
   }
 });
 
-btnLogin.onclick = () => signInWithPopup(auth, googleProvider).catch(e => alert(e.message));
-btnLogout.onclick = () => signOut(auth).then(() => location.reload());
 
-// ===============================
-// === 2. DATA SYNC LOGIC ===
-// ===============================
-function initRealtimeData() {
-  onSnapshot(query(collection(db,'santri'), orderBy('name')), snap=>{
-    santriCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
-    renderActiveTab();
-  });
-
-  onSnapshot(query(collection(db,'mapel'), orderBy('name')), snap=>{
-    mapelCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
-    renderActiveTab();
-  });
-
-  onSnapshot(query(collection(db,'nilai'), orderBy('createdAt','desc')), snap=>{
-    const list = snap.docs.map(d=>({id:d.id, ...d.data()}));
-    renderTransactions(list);
-  });
-}
-
-document.querySelectorAll('.tab').forEach(t=> t.onclick = ()=>{
+// ====== TABS ======
+document.querySelectorAll('.tab').forEach(t=> t.addEventListener('click', ()=>{
   activeTab = t.dataset.tab;
-  document.querySelectorAll('.tab').forEach(el=>el.classList.remove('active'));
-  t.classList.add('active');
   renderActiveTab();
-});
+}));
 
-function renderActiveTab() {
-  if(['UH','PTS','PAS'].includes(activeTab)) renderInputPage();
-  else if(activeTab === 'DAFTAR_MAPEL') mainPanel.innerHTML = "<h3>Daftar Mapel</h3>";
-  else if(activeTab === 'DAFTAR_SANTRI') mainPanel.innerHTML = "<h3>Daftar Santri</h3>";
-  // Tambahkan fungsi render lainnya milik Anda di sini
+function renderActiveTab(){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===activeTab));
+  if(['UH','PTS','PAS'].includes(activeTab))
+  renderInputTab(activeTab);
+  else if(activeTab==='DAFTAR_SANTRI') renderSantriEditor();
+  else if(activeTab==='DAFTAR_MAPEL') renderMapelEditor();
+  else if(activeTab === 'DAFTAR_GURU') renderGuruEditor();
+  else if(activeTab==='REKAP_SISWA') renderRekapSiswa();
 }
 
 // ====== INPUT TAB ======
-function renderInputPage() {
-  const mapelOptions = mapelCache.map(m=>`<option value="${m.name}">${m.name}</option>`).join('');
+function renderInputTab(type){
+  const mapelOptions = mapelCache.length ? `<option value="">-- Pilih Mapel --</option>` + mapelCache.map(m=>`<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`).join('') : '<option value="">-- kosong --</option>';
   mainPanel.innerHTML = `
-    <h3>Input Nilai ${activeTab}</h3>
+    <h3>Input Nilai — ${type}</h3>
+
+${type === 'PAS' ? `
+  <label>Jenis PAS</label>
+  <select id="selectJenisPAS">
+    <option value="">-- Pilih Jenis PAS --</option>
+    <option value="PAS_LISAN">PAS Lisan</option>
+    <option value="PAS_TULIS">PAS Tulis</option>
+    <option value="PAS_PRAKTEK">PAS Praktek</option>
+  </select>
+` : ''}
+
     <label>Pilih Mapel</label>
-    <select id="selMapel" style="width:100%; padding:8px;">${mapelOptions}</select>
-    <div style="margin-top:15px;">
-      ${santriCache.map(s => `<div style="padding:8px; border-bottom:1px solid #eee;">${s.name} <input type="number" class="score-in" data-id="${s.id}" data-name="${s.name}" style="float:right; width:60px;"></div>`).join('')}
+    <select id="selectMapel">${mapelOptions}</select>
+
+    <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+      <label style="margin-bottom:0">Skor Default kosong = tidak akan disimpan</label>
+      <button class="btn small" id="btnClearAll">Kosongkan Input</button>
     </div>
-    <button class="btn" id="btnSave" style="width:100%; margin-top:20px;">SIMPAN</button>
+
+    <div style="margin-top:10px" class="santri-list" id="santriList">
+      ${santriCache.map(s => `
+        <div class="santri-row" data-id="${s.id}">
+          <div class="santri-name">${escapeHtml(s.name)}</div>
+          <div style="width:120px"><input type="number" min="0" max="100" class="input-score" data-id="${s.id}" placeholder="Nilai"></div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div style="margin-top:10px" class="flex">
+      <button class="btn" id="btnSimpan">SIMPAN NILAI</button>
+      <button class="btn ghost" id="btnPreview">Tampilkan Preview</button>
+    </div>
   `;
-  
-  document.getElementById('btnSave').onclick = async () => {
-    const mapel = document.getElementById('selMapel').value;
-    const inputs = document.querySelectorAll('.score-in');
-    for(let i of inputs) {
-      if(i.value) {
-        await addDoc(collection(db, 'nilai'), {
-          santriId: i.dataset.id,
-          santriName: i.dataset.name,
-          mapel: mapel,
-          score: Number(i.value),
-          type: activeTab,
-          createdAt: serverTimestamp()
-        });
-      }
-    }
-    alert('Tersimpan!');
-  };
+  document.getElementById('btnSimpan').addEventListener('click', ()=> saveScores(type));
+  document.getElementById('btnClearAll').addEventListener('click', ()=>{ document.querySelectorAll('.input-score').forEach(i=>i.value=''); });
+  document.getElementById('btnPreview').addEventListener('click', ()=> showInteractivePreview(type));
 }
 
-function renderTransactions(data) {
-  transactionsPanel.innerHTML = data.slice(0,10).map(d => `<div>${d.santriName} - ${d.score} (${d.type})</div>`).join('');
-}
-
-async function saveScores(type){
+async function saveScores(type) {
   const mapel = document.getElementById('selectMapel').value;
-  if(!mapel) return alert('Pilih mapel terlebih dahulu');
+  if (!mapel) return alert('Pilih mapel terlebih dahulu');
 
   let finalType = type;
-
-  if(type === 'PAS'){
+  if (type === 'PAS') {
     const jenisPAS = document.getElementById('selectJenisPAS').value;
-    if(!jenisPAS) return alert('Pilih jenis PAS terlebih dahulu');
-    finalType = jenisPAS; // PAS_LISAN / PAS_TULIS / PAS_PRAKTEK
+    if (!jenisPAS) return alert('Pilih jenis PAS terlebih dahulu');
+    finalType = jenisPAS;
   }
 
   const inputs = document.querySelectorAll('.input-score');
-  let saved = 0;
+  const batch = writeBatch(db); // Gunakan Batch
+  let count = 0;
 
-  for(const input of inputs){
+  inputs.forEach(input => {
     const val = input.value.trim();
-    if(val === '') continue;
+    if (val !== '' && !isNaN(val)) {
+      const santri = santriCache.find(s => s.id === input.dataset.id);
+      const newDocRef = doc(nilaiCol); // Generate ID otomatis
+      batch.set(newDocRef, {
+        type: finalType,
+        mapel,
+        santriId: santri.id,
+        santriName: santri.name,
+        score: Number(val),
+        createdAt: serverTimestamp()
+      });
+      count++;
+    }
+  });
 
-    const num = Number(val);
-    if(isNaN(num)) continue;
-
-    const santri = santriCache.find(s=>s.id===input.dataset.id);
-    if(!santri) continue;
-
-    await addDoc(nilaiCol, {
-      type: finalType,
-      mapel,
-      santriId: santri.id,
-      santriName: santri.name,
-      score: num,
-      createdAt: serverTimestamp()
-    });
-    saved++;
+  if (count > 0) {
+    await batch.commit();
+    alert(`${count} nilai berhasil disimpan secara massal!`);
+    inputs.forEach(i => i.value = ''); // Reset form
   }
-
-  alert(`${saved} nilai berhasil disimpan!`);
 }
-
 
 function showInteractivePreview(type){
   const inputs = document.querySelectorAll('.input-score');
@@ -1582,59 +2043,54 @@ mapel = input;
 }
 
 
+// ==========================================
+// LOGIKA AUTH (GABUNGAN LAMA & BARU)
+// ==========================================
 
-
-// ====== AUTH ======
-btnLogin.addEventListener('click', async ()=>{ 
-  const provider = new GoogleAuthProvider();
-  try{ await signInWithPopup(auth, provider); }catch(e){ console.error(e); alert('Login gagal: '+ (e.message||e)); }
-});
-btnLogout.addEventListener('click', ()=> signOut(auth));
-
-onAuthStateChanged(auth, user=>{
-  if(user){ userLabel.innerText = user.displayName || user.email; btnLogin.style.display='none'; btnLogout.style.display='inline-block'; }
-  else { userLabel.innerText = 'Offline'; btnLogin.style.display='inline-block'; btnLogout.style.display='none'; }
-});
-
-// === LOGIKA LOGIN ===
-const googleProvider = new GoogleAuthProvider();
-
-btnLogin.onclick = () => {
-  signInWithPopup(auth, googleProvider)
-    .then(() => console.log("Login Berhasil"))
-    .catch((err) => alert("Gagal Login: " + err.message));
+// 1. Logika tombol Login
+btnLogin.onclick = async () => {
+  try {
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+    alert("Berhasil Login!");
+  } catch (error) {
+    console.error("Login Error:", error);
+    alert("Gagal Login: " + error.message);
+  }
 };
 
-btnLogout.onclick = () => {
-  signOut(auth).then(() => {
-    location.reload(); // Segarkan halaman saat logout
-  });
+// 2. Logika tombol Logout
+btnLogout.onclick = async () => {
+  if (confirm("Apakah Anda yakin ingin logout?")) {
+    try {
+      await signOut(auth);
+      alert("Berhasil Logout");
+    } catch (error) {
+      console.error("Logout Error:", error);
+    }
+  }
 };
 
-// === AUTH GUARD (Paling Penting) ===
+// 3. Pemantau Status Auth (Realtime)
 onAuthStateChanged(auth, (user) => {
-  const mainContent = document.getElementById('mainContent');
-  const loginPrompt = document.getElementById('loginPrompt');
-
   if (user) {
-    // Jika User Login
-    userLabel.innerText = "Halo, " + user.displayName;
+    // Jika user login
+    userLabel.innerHTML = `
+      <div style="display:flex; align-items:center; gap:8px">
+        <img src="${user.photoURL}" style="width:24px; border-radius:50%">
+        <span>${user.displayName}</span>
+      </div>
+    `;
     btnLogin.style.display = 'none';
     btnLogout.style.display = 'block';
     
-    mainContent.style.display = 'block'; // Tampilkan aplikasi
-    loginPrompt.style.display = 'none';  // Sembunyikan pesan login
-    
-    // Jalankan inisialisasi data di sini jika diperlukan
-    renderActiveTab(); 
+    // Aktifkan fitur tulis jika diperlukan
+    console.log("User UID:", user.uid);
   } else {
-    // Jika User Logout
-    userLabel.innerText = "Offline";
+    // Jika user logout / offline
+    userLabel.innerText = "Mode Read-Only (Offline)";
     btnLogin.style.display = 'block';
     btnLogout.style.display = 'none';
-    
-    mainContent.style.display = 'none'; // Sembunyikan aplikasi
-    loginPrompt.style.display = 'block'; // Tampilkan pesan login
   }
 });
 
