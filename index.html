@@ -381,12 +381,12 @@ button:disabled {
     <h1>Aplikasi Input Nilai — UH / PTS / PAS</h1>
     <div class="auth-area">
       <div id="userLabel">Offline</div>
-      <button class="btn small" id="btnLogin">Login (Google)</button>
+      <button class="btn small" id="btnLogin">Masukkan PIN Akses</button>
       <button class="btn small ghost" id="btnLogout" style="display:none">Logout</button>
     </div>
   </header>
 
-  <div class="card" id="mainAppContent" style="display:none">
+  <div class="card">
     <div class="tabs" id="tabs">
       <div class="tab active" data-tab="UH">INPUT UH</div>
       <div class="tab" data-tab="PTS">INPUT PTS</div>
@@ -435,8 +435,6 @@ import { getFirestore, collection, doc, addDoc, getDocs, updateDoc, deleteDoc,
   onSnapshot, query, orderBy, serverTimestamp, writeBatch, where 
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyC_5sI9JYaR-bbGWBQFvfl2SX1xe2WRPuE",
@@ -450,7 +448,35 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth();
+
+const santriCol = collection(db,'santri');
+const mapelCol  = collection(db,'mapel');
+const nilaiCol  = collection(db,'nilai');
+const guruCol = collection(db, 'guru');
+let guruCache = [];
+
+let isAuthorized = false; // Status awal terkunci
+const PIN_RAHASIA = "1234"; // Ganti dengan PIN yang Anda inginkan
+
+// Fungsi untuk meminta PIN
+function mintaAksesPIN() {
+  const inputPin = prompt("Masukkan PIN untuk mengakses fitur input:");
+  if (inputPin === PIN_RAHASIA) {
+    isAuthorized = true;
+    alert("Akses diterima!");
+    renderActiveTab(); // Render ulang tampilan setelah login
+  } else {
+    alert("PIN Salah!");
+  }
+}
+
+// Hubungkan ke tombol login di header
+document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('btnLogin');
+    if(btn) {
+        btn.onclick = mintaAksesPIN;
+    }
+});
 
 // ====== DOM ======
 const mainPanel = document.getElementById('mainPanel');
@@ -459,74 +485,6 @@ const transactionsFilter = document.getElementById('transactionsFilter');
 const userLabel = document.getElementById('userLabel');
 const btnLogin = document.getElementById('btnLogin');
 const btnLogout = document.getElementById('btnLogout');
-
-// A. Ambil Elemen dari HTML
-const userLabel = document.getElementById('userLabel');
-const btnLogin = document.getElementById('btnLogin');
-const btnLogout = document.getElementById('btnLogout');
-const mainAppContent = document.querySelector('.card'); // Sesuaikan selector ini
-
-// B. Konfigurasi Database & Akses
-const allowedEmails = ["abunafshah@gmail.com"];
-const santriCol = collection(db, 'santri');
-const mapelCol  = collection(db, 'mapel');
-const nilaiCol  = collection(db, 'nilai');
-const guruCol   = collection(db, 'guru');
-
-let guruCache = [];
-let santriCache = [];
-let mapelCache = [];
-
-// Fungsi Login Google
-async function loginGoogle() {
-  const provider = new GoogleAuthProvider();
-  try {
-    await signInWithPopup(auth, provider);
-  } catch (error) {
-    console.error("Gagal Login:", error);
-    alert("Login gagal: " + error.message);
-  }
-}
-
-// Fungsi Logout
-async function logoutGoogle() {
-  try {
-    await signOut(auth);
-    alert("Berhasil Logout");
-  } catch (error) {
-    console.error("Gagal Logout:", error);
-  }
-}
-
-btnLogin.addEventListener('click', loginGoogle);
-btnLogout.addEventListener('click', logoutGoogle);
-
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    // 1. Cek apakah email diizinkan
-    if (allowedEmails.includes(user.email)) {
-      userLabel.innerText = "Halo, " + (user.displayName || user.email);
-      btnLogin.style.display = 'none';
-      btnLogout.style.display = 'block';
-      
-      if (mainAppContent) mainAppContent.style.display = 'block';
-      
-      // Jalankan aplikasi
-      renderActiveTab(); 
-    } else {
-      // 2. Jika email tidak terdaftar
-      alert("Akses Ditolak!\nEmail (" + user.email + ") tidak terdaftar.");
-      signOut(auth);
-    }
-  } else {
-    // 3. Jika user logout atau belum login
-    userLabel.innerText = "Silakan Login";
-    btnLogin.style.display = 'block';
-    btnLogout.style.display = 'none';
-    
-    if (mainAppContent) mainAppContent.style.display = 'none';
-  }
-});
 
 let activeTab = 'UH';
 let santriCache = [];
@@ -600,15 +558,44 @@ document.querySelectorAll('.tab').forEach(t=> t.addEventListener('click', ()=>{
   renderActiveTab();
 }));
 
-function renderActiveTab(){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===activeTab));
-  if(['UH','PTS','PAS'].includes(activeTab))
-  renderInputTab(activeTab);
-  else if(activeTab==='DAFTAR_SANTRI') renderSantriEditor();
-  else if(activeTab==='DAFTAR_MAPEL') renderMapelEditor();
-  else if(activeTab === 'DAFTAR_GURU') renderGuruEditor();
-  else if(activeTab==='REKAP_SISWA') renderRekapSiswa();
+// --- KODE BARU (HASIL GABUNGAN) ---
+function renderActiveTab() {
+  const userLabel = document.getElementById('userLabel');
+  
+  // 1. Cek Otorisasi
+  if (!isAuthorized && activeTab !== 'REKAP_SISWA') {
+    userLabel.innerText = "Terkunci";
+    mainPanel.innerHTML = `
+      <div style="text-align:center; padding:40px;">
+        <h3 style="color:var(--danger)">Akses Dibatasi</h3>
+        <p>Silahkan klik tombol di pojok kanan atas untuk memasukkan PIN.</p>
+        <div style="font-size:40px">🔒</div>
+      </div>`;
+    // Update tampilan tab agar tetap sinkron secara visual
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === activeTab));
+    return;
+  }
+
+  // 2. Jika sudah Authorized atau sedang di tab REKAP_SISWA
+  userLabel.innerText = isAuthorized ? "Akses Terbuka (Admin)" : "Mode Lihat (Rekap)";
+  
+  // Update class active pada tab
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === activeTab));
+
+  // Jalankan logika render masing-masing panel
+  if (['UH', 'PTS', 'PAS'].includes(activeTab)) {
+    renderInputTab(activeTab);
+  } else if (activeTab === 'DAFTAR_SANTRI') {
+    renderSantriEditor();
+  } else if (activeTab === 'DAFTAR_MAPEL') {
+    renderMapelEditor();
+  } else if (activeTab === 'DAFTAR_GURU') {
+    renderGuruEditor();
+  } else if (activeTab === 'REKAP_SISWA') {
+    renderRekapSiswa();
+  }
 }
+
 
 // ====== INPUT TAB ======
 function renderInputTab(type){
@@ -2026,58 +2013,29 @@ mapel = input;
   });
 }
 
-
-// ==========================================
-// LOGIKA AUTH (GABUNGAN LAMA & BARU)
-// ==========================================
-
-// 1. Logika tombol Login
-btnLogin.onclick = async () => {
-  try {
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
-    alert("Berhasil Login!");
-  } catch (error) {
-    console.error("Login Error:", error);
-    alert("Gagal Login: " + error.message);
-  }
-};
-
-// 2. Logika tombol Logout
-btnLogout.onclick = async () => {
-  if (confirm("Apakah Anda yakin ingin logout?")) {
-    try {
-      await signOut(auth);
-      alert("Berhasil Logout");
-    } catch (error) {
-      console.error("Logout Error:", error);
+// ====== AUTH SISTEM PIN ======
+function checkPin() {
+    const userPin = prompt("Masukkan PIN Akses:");
+    if (userPin === PIN_RAHASIA) {
+        isAuthorized = true;
+        alert("Akses Diterima!");
+        updateUIStatus();
+        renderActiveTab(); // Render ulang tab setelah login
+    } else {
+        alert("PIN Salah!");
     }
-  }
-};
+}
 
-// 3. Pemantau Status Auth (Realtime)
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    // Jika user login
-    userLabel.innerHTML = `
-      <div style="display:flex; align-items:center; gap:8px">
-        <img src="${user.photoURL}" style="width:24px; border-radius:50%">
-        <span>${user.displayName}</span>
-      </div>
-    `;
-    btnLogin.style.display = 'none';
-    btnLogout.style.display = 'block';
-    
-    // Aktifkan fitur tulis jika diperlukan
-    console.log("User UID:", user.uid);
-  } else {
-    // Jika user logout / offline
-    userLabel.innerText = "Mode Read-Only (Offline)";
-    btnLogin.style.display = 'block';
-    btnLogout.style.display = 'none';
-  }
-});
+function updateUIStatus() {
+    userLabel.innerText = isAuthorized ? "Mode: Petugas" : "Offline";
+    btnLogin.innerText = isAuthorized ? "Logout" : "Login (PIN)";
+    // Tombol login berfungsi jadi logout kalau sudah masuk
+    btnLogin.onclick = isAuthorized ? () => { isAuthorized = false; updateUIStatus(); renderActiveTab(); } : checkPin;
+}
 
+// Inisialisasi awal tombol login
+btnLogin.onclick = checkPin;
+btnLogout.style.display = 'none'; // Sembunyikan tombol logout bawaan lama
 // initial render
 renderActiveTab();
 renderTransactionsWith(window._latestTx||[]);
