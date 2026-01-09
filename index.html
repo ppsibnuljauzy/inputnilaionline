@@ -452,57 +452,6 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth();
 
-// Pantau status login secara realtime
-onAuthStateChanged(auth, (user) => {
-  const mainContent = document.querySelector('.card'); // Div utama aplikasi
-  const authArea = document.querySelector('.auth-area');
-
-  if (user) {
-    // JIKA USER SUDAH LOGIN
-    userLabel.innerText = "Halo, " + user.displayName;
-    btnLogin.style.display = 'none';
-    btnLogout.style.display = 'block';
-    mainContent.style.display = 'block'; // Tampilkan aplikasi
-    
-    console.log("User UID:", user.uid);
-  } else {
-    // JIKA USER BELUM LOGIN
-    userLabel.innerText = "Silakan Login";
-    btnLogin.style.display = 'block';
-    btnLogout.style.display = 'none';
-    mainContent.style.display = 'none'; // Sembunyikan aplikasi
-    
-    // Opsional: Jalankan login otomatis (popup) jika ingin langsung memaksa login
-    // loginGoogle(); 
-  }
-});
-
-// Fungsi Login
-async function loginGoogle() {
-  const provider = new GoogleAuthProvider();
-  try {
-    await signInWithPopup(auth, provider);
-  } catch (error) {
-    console.error("Gagal Login:", error);
-    alert("Login gagal, silakan coba lagi.");
-  }
-}
-
-// Fungsi Logout
-btnLogout.addEventListener('click', () => {
-  signOut(auth).then(() => {
-    alert("Berhasil Logout");
-  });
-});
-
-btnLogin.addEventListener('click', loginGoogle);
-
-const santriCol = collection(db,'santri');
-const mapelCol  = collection(db,'mapel');
-const nilaiCol  = collection(db,'nilai');
-const guruCol = collection(db, 'guru');
-let guruCache = [];
-
 // ====== DOM ======
 const mainPanel = document.getElementById('mainPanel');
 const transactionsPanel = document.getElementById('transactionsPanel');
@@ -511,36 +460,71 @@ const userLabel = document.getElementById('userLabel');
 const btnLogin = document.getElementById('btnLogin');
 const btnLogout = document.getElementById('btnLogout');
 
-// 1. Definisikan daftar email di awal script module
-const allowedEmails = [
-  "abunafshah@gmail.com" 
-];
+// A. Ambil Elemen dari HTML
+const userLabel = document.getElementById('userLabel');
+const btnLogin = document.getElementById('btnLogin');
+const btnLogout = document.getElementById('btnLogout');
+const mainAppContent = document.querySelector('.card'); // Sesuaikan selector ini
 
-// 2. Pasang Listener Status Auth
+// B. Konfigurasi Database & Akses
+const allowedEmails = ["abunafshah@gmail.com"];
+const santriCol = collection(db, 'santri');
+const mapelCol  = collection(db, 'mapel');
+const nilaiCol  = collection(db, 'nilai');
+const guruCol   = collection(db, 'guru');
+
+let guruCache = [];
+let santriCache = [];
+let mapelCache = [];
+
+// Fungsi Login Google
+async function loginGoogle() {
+  const provider = new GoogleAuthProvider();
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (error) {
+    console.error("Gagal Login:", error);
+    alert("Login gagal: " + error.message);
+  }
+}
+
+// Fungsi Logout
+async function logoutGoogle() {
+  try {
+    await signOut(auth);
+    alert("Berhasil Logout");
+  } catch (error) {
+    console.error("Gagal Logout:", error);
+  }
+}
+
+btnLogin.addEventListener('click', loginGoogle);
+btnLogout.addEventListener('click', logoutGoogle);
+
 onAuthStateChanged(auth, (user) => {
-  const mainContent = document.getElementById('mainAppContent');
-
   if (user) {
-    // CEK APAKAH EMAIL TERDAFTAR
+    // 1. Cek apakah email diizinkan
     if (allowedEmails.includes(user.email)) {
-      // JIKA TERDAFTAR: Izinkan masuk
-      userLabel.innerText = "Halo, " + user.displayName;
+      userLabel.innerText = "Halo, " + (user.displayName || user.email);
       btnLogin.style.display = 'none';
       btnLogout.style.display = 'block';
-      mainContent.style.display = 'block'; // Tampilkan konten aplikasi
       
-      renderActiveTab(); // Jalankan fungsi aplikasi
+      if (mainAppContent) mainAppContent.style.display = 'block';
+      
+      // Jalankan aplikasi
+      renderActiveTab(); 
     } else {
-      // JIKA TIDAK TERDAFTAR: Beri peringatan dan Logout paksa
-      alert("Akses Ditolak!\nEmail (" + user.email + ") tidak terdaftar dalam sistem pengajar.");
-      signOut(auth); 
+      // 2. Jika email tidak terdaftar
+      alert("Akses Ditolak!\nEmail (" + user.email + ") tidak terdaftar.");
+      signOut(auth);
     }
   } else {
-    // JIKA USER SUDAH LOGOUT ATAU BELUM LOGIN
+    // 3. Jika user logout atau belum login
     userLabel.innerText = "Silakan Login";
     btnLogin.style.display = 'block';
     btnLogout.style.display = 'none';
-    mainContent.style.display = 'none'; // Sembunyikan konten aplikasi
+    
+    if (mainAppContent) mainAppContent.style.display = 'none';
   }
 });
 
