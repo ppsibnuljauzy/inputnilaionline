@@ -131,6 +131,7 @@ header {
   border:1px solid rgba(6,182,212,.15);
   white-space:nowrap;
   backdrop-filter: blur(4px);
+transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .tab:hover {
@@ -143,6 +144,7 @@ header {
   color:#fff;
   border-color:transparent;
   box-shadow:0 6px 16px rgba(6,182,212,.45);
+transform: scale(1.05); /* Sedikit membesar saat aktif agar terasa interaktif */
 }
 
 /* =========================
@@ -373,6 +375,120 @@ button:disabled {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
+.badge {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+input[type="number"] {
+  font-size: 16px; /* Mencegah auto-zoom di iOS Safari */
+  -moz-appearance: textfield;
+}
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.btn.edit {
+  background: linear-gradient(135deg, #f59e0b, #d97706); /* Warna Oranye/Amber */
+  border: 1px solid #b45309;
+  box-shadow: 0 3px 10px rgba(245, 158, 11, 0.3);
+  margin-right: 4px; /* Memberi jarak dengan tombol hapus */
+}
+
+.btn.edit:hover {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  transform: translateY(-1px);
+}
+/* Animasi konten masuk */
+@keyframes fadeIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(10px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+#mainPanel {
+  animation: fadeIn 0.4s ease-out;
+  /* Memastikan transisi smooth saat tinggi panel berubah */
+  transition: all 0.3s ease;
+}
+/* Efek saat tombol ditekan */
+.btn:active, .tab:active {
+  transform: scale(0.95);
+  filter: brightness(0.9);
+}
+
+/* Membuat scrollbar di tab mobile lebih halus */
+.tabs {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Menghilangkan scrollbar tapi tetap bisa di-scroll (opsional agar bersih) */
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+.tabs {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+/* Animasi Putar */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 3px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 0.8s linear infinite;
+  margin-right: 10px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* State tombol saat loading */
+.btn-loading {
+  pointer-events: none; /* Mencegah klik ganda */
+  opacity: 0.8;
+}
+.badge-uh { background: #dcfce7; color: #166534; }
+.badge-pts { background: #fef9c3; color: #854d0e; }
+.badge-pas { background: #dbeafe; color: #1e40af; }
+.input-score.error {
+  border: 2px solid var(--danger) !important;
+  background-color: #fff1f2;
+}
+/* Secara default tetap tampil */
+.tab { display: block; }
+
+/* Sembunyikan Tab Khusus Admin */
+body.role-user .tab[data-tab="DAFTAR_SANTRI"],
+body.role-user .tab[data-tab="DAFTAR_MAPEL"],
+body.role-user .tab[data-tab="DAFTAR_GURU"],
+body.role-user .tab[data-tab="REKAP_SISWA"] {
+  display: none;
+}
+
+/* Sembunyikan Panel Kanan (Tabel Transaksi) untuk User */
+body.role-user .grid {
+  grid-template-columns: 1fr; /* Ubah grid menjadi 1 kolom penuh */
+}
+
+body.role-user .grid > .panel:nth-child(2) {
+  display: none; /* Sembunyikan panel kedua (tabel transaksi) */
+}
 </style>
 </head>
 <body>
@@ -429,6 +545,8 @@ button:disabled {
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <script type="module">
+let currentPage = 1;
+const rowsPerPage = 10; // Jumlah data per halaman
 // ====== FIREBASE INIT ======
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
 import { getFirestore, collection, doc, addDoc, getDocs, updateDoc, deleteDoc, 
@@ -455,28 +573,38 @@ const nilaiCol  = collection(db,'nilai');
 const guruCol = collection(db, 'guru');
 let guruCache = [];
 
-let isAuthorized = false; // Status awal terkunci
-const PIN_RAHASIA = "1234"; // Ganti dengan PIN yang Anda inginkan
+// ====== CONFIGURASI AKSES ======
+const PIN_USER  = "1234";  // PIN untuk penginput nilai
+const PIN_ADMIN = "555";  // PIN untuk manajemen (Ganti sesuai keinginan)
 
-// Fungsi untuk meminta PIN
-function mintaAksesPIN() {
-  const inputPin = prompt("Masukkan PIN untuk mengakses fitur input:");
-  if (inputPin === PIN_RAHASIA) {
+let userRole = null; // null, 'USER', atau 'ADMIN'
+let isAuthorized = false;
+
+function loginAkses() {
+  const inputPin = prompt("Masukkan PIN Akses:");
+  if (inputPin === PIN_ADMIN) {
     isAuthorized = true;
-    alert("Akses diterima!");
-    renderActiveTab(); // Render ulang tampilan setelah login
+    userRole = 'ADMIN';
+    document.body.classList.remove('role-user'); // Pastikan class user bersih
+    activeTab = 'DAFTAR_SANTRI';
+    alert("Login berhasil sebagai ADMIN");
+  } else if (inputPin === PIN_USER) {
+    isAuthorized = true;
+    userRole = 'USER';
+    document.body.classList.add('role-user'); // TAMBAHKAN INI
+    activeTab = 'UH';
+    alert("Login berhasil sebagai USER");
   } else {
     alert("PIN Salah!");
+    return;
   }
+  renderActiveTab();
 }
 
-// Hubungkan ke tombol login di header
-document.addEventListener('DOMContentLoaded', () => {
-    const btn = document.getElementById('btnLogin');
-    if(btn) {
-        btn.onclick = mintaAksesPIN;
-    }
-});
+// Pastikan event listener dipasang
+document.getElementById('btnLogin').onclick = loginAkses;
+
+
 
 // ====== DOM ======
 const mainPanel = document.getElementById('mainPanel');
@@ -515,7 +643,6 @@ async function hapusDuplikatSantri(){
 }
 
 
-
 // ====== REALTIME SNAPSHOTS ======
 onSnapshot(query(santriCol, orderBy('name')), snap=>{
   santriCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -537,10 +664,13 @@ onSnapshot(query(mapelCol, orderBy('name')), snap=>{
 });
 onSnapshot(query(nilaiCol, orderBy('createdAt','desc')), snap=>{
   window._latestTx = snap.docs.map(d=>({id:d.id, ...d.data()}));
-  // reset to page 1 when new live data comes in to avoid empty page issues
-  currentPage = 1;
-  renderTransactionsWith(window._latestTx);
-  if(activeTab==='REKAP_SISWA') renderRekapSiswa();
+  
+  // HANYA jalankan render transaksi jika yang login adalah ADMIN
+  if(userRole === 'ADMIN') {
+    renderTransactionsWith(window._latestTx);
+  }
+  
+  if(activeTab === 'REKAP_SISWA' && userRole === 'ADMIN') renderRekapSiswa();
 });
 onSnapshot(query(guruCol, orderBy('name')), snap => {
   guruCache = snap.docs.map(d => ({ id:d.id, ...d.data() }));
@@ -558,126 +688,502 @@ document.querySelectorAll('.tab').forEach(t=> t.addEventListener('click', ()=>{
   renderActiveTab();
 }));
 
-// --- KODE BARU (HASIL GABUNGAN) ---
-function renderActiveTab() {
-  const userLabel = document.getElementById('userLabel');
-  
-  // 1. Cek Otorisasi
-  if (!isAuthorized && activeTab !== 'REKAP_SISWA') {
-    userLabel.innerText = "Terkunci";
-    mainPanel.innerHTML = `
-      <div style="text-align:center; padding:40px;">
-        <h3 style="color:var(--danger)">Akses Dibatasi</h3>
-        <p>Silahkan klik tombol di pojok kanan atas untuk memasukkan PIN.</p>
-        <div style="font-size:40px">🔒</div>
-      </div>`;
-    // Update tampilan tab agar tetap sinkron secara visual
-    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === activeTab));
+
+function renderFilterUI() {
+  const filterArea = document.getElementById('transactionsFilter');
+  if (!filterArea) return;
+
+  filterArea.innerHTML = `
+    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
+      <input type="text" id="mainSearchSantri" placeholder="Cari Nama Santri..." style="padding:8px; border-radius:8px; border:1px solid #ddd;">
+      <select id="mainFilterMapel" style="padding:8px; border-radius:8px; border:1px solid #ddd;">
+        <option value="">Semua Mapel</option>
+        ${mapelCache.map(m => `<option value="${m.name}">${m.name}</option>`).join('')}
+      </select>
+      <select id="mainFilterType" style="padding:8px; border-radius:8px; border:1px solid #ddd;">
+        <option value="">Semua Tipe</option>
+        <option value="UH">UH</option>
+        <option value="PTS">PTS</option>
+        <option value="PAS_LISAN">PAS Lisan</option>
+        <option value="PAS_TULIS">PAS Tulis</option>
+        <option value="PAS_PRAKTEK">PAS Praktek</option>
+      </select>
+    </div>
+    <div style="margin-bottom:15px;">
+      <button class="btn small ghost" onclick="window.exportToExcel()" style="width:100%; background:#22c55e; color:white; border:none;">
+        📗 DOWNLOAD REKAP EXCEL (.XLSX)
+      </button>
+    </div>
+  `;
+
+  // Langsung pasang event listener setelah innerHTML diisi
+  ['mainSearchSantri', 'mainFilterMapel', 'mainFilterType'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) {
+      el.addEventListener('input', () => {
+        currentPage = 1; 
+        renderTransactionsWith(window._latestTx || []);
+      });
+    }
+  });
+}
+
+
+// Fungsi ini harus menerima parameter dataList
+function renderTransactionsWith(dataList) {
+  const panel = document.getElementById('transactionsPanel');
+  if (!isAuthorized || userRole !== 'ADMIN' || !panel) {
+    if (panel) panel.innerHTML = "";
     return;
   }
 
-  // 2. Jika sudah Authorized atau sedang di tab REKAP_SISWA
-  userLabel.innerText = isAuthorized ? "Akses Terbuka (Admin)" : "Mode Lihat (Rekap)";
-  
-  // Update class active pada tab
-  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === activeTab));
+  // 1. Ambil Nilai Filter
+  const search = document.getElementById('mainSearchSantri')?.value.toLowerCase() || "";
+  const fMapel = document.getElementById('mainFilterMapel')?.value || "";
+  const fType = document.getElementById('mainFilterType')?.value || "";
 
-  // Jalankan logika render masing-masing panel
-  if (['UH', 'PTS', 'PAS'].includes(activeTab)) {
-    renderInputTab(activeTab);
-  } else if (activeTab === 'DAFTAR_SANTRI') {
-    renderSantriEditor();
-  } else if (activeTab === 'DAFTAR_MAPEL') {
-    renderMapelEditor();
-  } else if (activeTab === 'DAFTAR_GURU') {
-    renderGuruEditor();
-  } else if (activeTab === 'REKAP_SISWA') {
-    renderRekapSiswa();
+  // 2. Logika Filter Data
+  const filtered = dataList.filter(d => {
+    const matchName = (d.santriName || "").toLowerCase().includes(search);
+    const matchMapel = (fMapel === "" || d.mapel === fMapel);
+    const matchType = (fType === "" || d.type === fType);
+    return matchName && matchMapel && matchType;
+  });
+
+  // 3. Logika Paginasi
+  const totalPages = Math.ceil(filtered.length / rowsPerPage);
+  if (currentPage > totalPages) currentPage = Math.max(1, totalPages);
+  
+  const start = (currentPage - 1) * rowsPerPage;
+  const end = start + rowsPerPage;
+  const paginatedData = filtered.slice(start, end);
+
+  // 4. Render HTML
+  let html = `
+    <div style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+        <span class="badge">${filtered.length} Total Data</span>
+        <button class="btn small delete-all" id="btnHapusSemua">HAPUS SEMUA</button>
+    </div>
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Santri</th>
+            <th>Mapel</th>
+            <th>Guru</th>
+            <th>Tipe</th>
+            <th>Nilai</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${paginatedData.map(d => `
+            <tr>
+              <td data-label="Santri">${escapeHtml(d.santriName)}</td>
+              <td data-label="Mapel">${escapeHtml(d.mapel)}</td>
+              <td data-label="Guru">${escapeHtml(d.guru || '-')}</td>
+              <td data-label="Tipe"><span class="badge badge-${d.type.toLowerCase()}">${d.type}</span></td>
+              <td data-label="Nilai"><strong>${d.score}</strong></td>
+              <td data-label="Aksi">
+                <button class="btn small edit" onclick="window.editSingleNilai('${d.id}', ${d.score})">Edit</button>
+                <button class="btn small delete" onclick="window.deleteSingleNilai('${d.id}')">Hapus</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:15px; display:flex; justify-content:center; gap:10px; align-items:center;">
+      <button class="btn small ghost" ${currentPage === 1 ? 'disabled' : ''} id="prevPage">Prev</button>
+      <span style="font-size:13px; font-weight:bold;">Halaman ${currentPage} dari ${totalPages || 1}</span>
+      <button class="btn small ghost" ${currentPage >= totalPages ? 'disabled' : ''} id="nextPage">Next</button>
+    </div>
+  `;
+  
+  panel.innerHTML = html;
+
+  // 5. Event Listeners
+  const btnHapus = document.getElementById('btnHapusSemua');
+  if (btnHapus) btnHapus.onclick = hapusSemuaNilai;
+
+  document.getElementById('prevPage').onclick = () => {
+    if (currentPage > 1) {
+      currentPage--;
+      renderTransactionsWith(window._latestTx);
+    }
+  };
+
+  document.getElementById('nextPage').onclick = () => {
+    if (currentPage < totalPages) {
+      currentPage++;
+      renderTransactionsWith(window._latestTx);
+    }
+  };
+}
+
+
+function renderActiveTab() {
+  const userLabel = document.getElementById('userLabel');
+  // Tambahkan baris ini di awal fungsi:
+  mainPanel.style.animation = 'none';
+  mainPanel.offsetHeight; // Trik "reflow" agar browser sadar animasi di-reset
+  mainPanel.style.animation = null;
+  const tabsElement = document.querySelectorAll('.tab');
+  
+  // 1. CEK OTORISASI UMUM
+  if (!isAuthorized) {
+    userLabel.innerText = "Terkunci";
+    mainPanel.innerHTML = `<div style="text-align:center; padding:40px;"><h3>Akses Dibatasi</h3></div>`;
+    transactionsPanel.innerHTML = ""; // Kosongkan tabel jika belum login
+    transactionsFilter.innerHTML = ""; // Kosongkan filter jika belum login
+    return;
   }
+
+  userLabel.innerText = userRole === 'ADMIN' ? "Mode: Admin" : "Mode: Penginput";
+  
+  // 2. LOGIKA RENDER PANEL UTAMA (Sisi Kiri)
+  const adminTabs = ['DAFTAR_SANTRI', 'DAFTAR_MAPEL', 'DAFTAR_GURU', 'REKAP_SISWA'];
+  if (userRole === 'USER' && adminTabs.includes(activeTab)) {
+    mainPanel.innerHTML = `<div class="card" style="text-align:center; color:red; padding:20px;"><h4>Akses Ditolak!</h4></div>`;
+  } else {
+    // Jalankan render tab yang dipilih
+    if (['UH', 'PTS', 'PAS'].includes(activeTab)) renderInputTab(activeTab);
+    else if (activeTab === 'DAFTAR_SANTRI') renderSantriEditor();
+    else if (activeTab === 'DAFTAR_MAPEL') renderMapelEditor();
+    else if (activeTab === 'DAFTAR_GURU') renderGuruEditor();
+    else if (activeTab === 'REKAP_SISWA') renderRekapSiswa();
+  }
+
+  // 3. LOGIKA TABEL TRANSAKSI (Sisi Kanan) - INI KUNCINYA
+  if (userRole === 'ADMIN') {
+    // Tampilkan filter dan tabel hanya untuk ADMIN
+    renderFilterUI(); 
+    renderTransactionsWith(window._latestTx || []);
+  } else {
+    // Jika role adalah USER, paksa panel kanan kosong atau beri pesan
+    document.getElementById('transactionsFilter').innerHTML = ""; 
+    transactionsPanel.innerHTML = `
+      <div style="text-align:center; padding:20px; color:#999;">
+        <p>Riwayat transaksi hanya dapat dilihat oleh Admin.</p>
+        <div style="font-size:40px">🚫</div>
+      </div>`;
+  }
+
+  tabsElement.forEach(t => t.classList.toggle('active', t.dataset.tab === activeTab));
 }
 
 
 // ====== INPUT TAB ======
 function renderInputTab(type){
-  const mapelOptions = mapelCache.length ? `<option value="">-- Pilih Mapel --</option>` + mapelCache.map(m=>`<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`).join('') : '<option value="">-- kosong --</option>';
+  const guruOptions = guruCache.length
+    ? `<option value="">-- Pilih Guru --</option>` + guruCache.map(g=>`<option value="${escapeHtml(g.name)}">${escapeHtml(g.name)}</option>`).join('')
+    : '<option value="">-- kosong --</option>';
+
+  const mapelOptions = mapelCache.length 
+    ? `<option value="">-- Pilih Mapel --</option>` + mapelCache.map(m=>`<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`).join('') 
+    : '<option value="">-- kosong --</option>';
+
   mainPanel.innerHTML = `
     <h3>Input Nilai — ${type}</h3>
 
-${type === 'PAS' ? `
-  <label>Jenis PAS</label>
-  <select id="selectJenisPAS">
-    <option value="">-- Pilih Jenis PAS --</option>
-    <option value="PAS_LISAN">PAS Lisan</option>
-    <option value="PAS_TULIS">PAS Tulis</option>
-    <option value="PAS_PRAKTEK">PAS Praktek</option>
-  </select>
-` : ''}
+    ${type === 'PAS' ? `
+      <label>Jenis PAS</label>
+      <select id="selectJenisPAS">
+        <option value="">-- Pilih Jenis PAS --</option>
+        <option value="PAS_LISAN">PAS Lisan</option>
+        <option value="PAS_TULIS">PAS Tulis</option>
+        <option value="PAS_PRAKTEK">PAS Praktek</option>
+      </select>
+    ` : ''}
+
+    <label>Pilih Guru Pengampu</label>
+    <select id="selectGuru">${guruOptions}</select>
 
     <label>Pilih Mapel</label>
     <select id="selectMapel">${mapelOptions}</select>
 
-    <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
-      <label style="margin-bottom:0">Skor Default kosong = tidak akan disimpan</label>
-      <button class="btn small" id="btnClearAll">Kosongkan Input</button>
+    <div style="margin-top:15px;">
+      <label>Cari Nama Santri (Filter Cepat)</label>
+      <input type="text" id="quickSearchSantri" placeholder="Ketik nama santri..." 
+             style="padding:10px; border-radius:8px; border:1px solid var(--primary); width:100%; margin-bottom:10px;">
     </div>
 
     <div style="margin-top:10px" class="santri-list" id="santriList">
       ${santriCache.map(s => `
         <div class="santri-row" data-id="${s.id}">
-          <div class="santri-name">${escapeHtml(s.name)}</div>
-          <div style="width:120px"><input type="number" min="0" max="100" class="input-score" data-id="${s.id}" placeholder="Nilai"></div>
+          <div class="santri-name" style="flex:1">${escapeHtml(s.name)}</div>
+          <div style="width:100px">
+            <input type="number" class="input-score" data-id="${s.id}" placeholder="0-100">
+          </div>
         </div>
       `).join('')}
     </div>
 
-    <div style="margin-top:10px" class="flex">
-      <button class="btn" id="btnSimpan">SIMPAN NILAI</button>
-      <button class="btn ghost" id="btnPreview">Tampilkan Preview</button>
+    <div style="margin-top:20px; display:flex; gap:10px;">
+      <button class="btn" id="btnSimpan" style="flex:1;">SIMPAN NILAI</button>
+      <button class="btn ghost" id="btnPreview" style="flex:1;">PREVIEW</button>
     </div>
   `;
-  document.getElementById('btnSimpan').addEventListener('click', ()=> saveScores(type));
-  document.getElementById('btnClearAll').addEventListener('click', ()=>{ document.querySelectorAll('.input-score').forEach(i=>i.value=''); });
-  document.getElementById('btnPreview').addEventListener('click', ()=> showInteractivePreview(type));
-}
+
+  // --- BAGIAN EVENT LISTENER OTOMATISASI MAPEL ---
+  const selGuru = document.getElementById('selectGuru');
+  const selMapel = document.getElementById('selectMapel');
+
+  selGuru.onchange = (e) => {
+    const namaGuruTerpilih = e.target.value;
+    // Cari data guru di cache berdasarkan nama
+    const dataGuru = guruCache.find(g => g.name === namaGuruTerpilih);
+
+    if (dataGuru && dataGuru.mapel) {
+      // Set value selectMapel sesuai mapel yang diampu guru tersebut
+      selMapel.value = dataGuru.mapel;
+      
+      // Opsional: Beri highlight sedikit agar user sadar mapel berubah otomatis
+      selMapel.style.backgroundColor = "var(--primary-soft)";
+      setTimeout(() => { selMapel.style.backgroundColor = ""; }, 1000);
+    } else {
+      selMapel.value = "";
+    }
+  };
+
+  // Event Listeners lainnya
+  document.getElementById('btnSimpan').onclick = () => saveScores(type);
+  document.getElementById('btnPreview').onclick = () => showInteractivePreview(type);
+  
+  // Fitur Live Search
+  document.getElementById('quickSearchSantri').oninput = (e) => {
+
+    const term = e.target.value.toLowerCase();
+    document.querySelectorAll('.santri-row').forEach(row => {
+      const name = row.querySelector('.santri-name').innerText.toLowerCase();
+      row.style.display = name.includes(term) ? 'flex' : 'none';
+    });
+  };
+// >>> TEMPELKAN KODE VALIDASI REAL-TIME DI SINI <<<
+  document.querySelectorAll('.input-score').forEach(input => {
+    input.addEventListener('input', (e) => {
+      const val = Number(e.target.value);
+      if (e.target.value !== "" && (val < 0 || val > 100)) {
+        e.target.style.border = "2px solid #ef4444";
+        e.target.style.backgroundColor = "#fff1f2";
+        e.target.classList.add('error');
+      } else {
+        e.target.style.border = "";
+        e.target.style.backgroundColor = "";
+        e.target.classList.remove('error');
+      }
+    });
+  });
+} // Akhir dari fungsi renderInputTab
+
 
 async function saveScores(type) {
+  const btnSimpan = document.getElementById('btnSimpan');
+  const originalText = btnSimpan.innerHTML;
+
   const mapel = document.getElementById('selectMapel').value;
-  if (!mapel) return alert('Pilih mapel terlebih dahulu');
+  const guru = document.getElementById('selectGuru').value;
+  
+  // 1. Validasi Input Dasar
+  if (!mapel || !guru) return alert('Pilih Mapel dan Guru terlebih dahulu!');
 
   let finalType = type;
   if (type === 'PAS') {
-    const jenisPAS = document.getElementById('selectJenisPAS').value;
-    if (!jenisPAS) return alert('Pilih jenis PAS terlebih dahulu');
-    finalType = jenisPAS;
+    const valJenis = document.getElementById('selectJenisPAS').value;
+    if (!valJenis) return alert('Pilih Jenis PAS!');
+    finalType = valJenis;
   }
 
   const inputs = document.querySelectorAll('.input-score');
-  const batch = writeBatch(db); // Gunakan Batch
+  const batch = writeBatch(db);
   let count = 0;
+  let hasError = false; 
 
+  // 2. Proses Validasi Visual & Persiapan Data
   inputs.forEach(input => {
-    const val = input.value.trim();
-    if (val !== '' && !isNaN(val)) {
-      const santri = santriCache.find(s => s.id === input.dataset.id);
-      const newDocRef = doc(nilaiCol); // Generate ID otomatis
-      batch.set(newDocRef, {
-        type: finalType,
-        mapel,
-        santriId: santri.id,
-        santriName: santri.name,
-        score: Number(val),
-        createdAt: serverTimestamp()
-      });
-      count++;
+    // Reset status error (hapus border merah jika ada)
+    input.classList.remove('error');
+    input.style.border = ""; // Reset style manual jika tidak pakai class CSS
+    
+    const scoreVal = input.value.trim();
+    
+    if (scoreVal !== "") {
+      const scoreNum = Number(scoreVal);
+
+      // Cek apakah angka valid 0-100
+      if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 100) {
+        input.classList.add('error'); 
+        input.style.border = "2px solid #ef4444"; // Border merah (Danger)
+        input.style.backgroundColor = "#fff1f2"; // Background kemerahan
+        hasError = true;
+      } else {
+        const santri = santriCache.find(s => s.id === input.dataset.id);
+        const newDocRef = doc(collection(db, 'nilai'));
+        batch.set(newDocRef, {
+          type: finalType,
+          mapel,
+          guru,
+          santriId: santri.id,
+          santriName: santri.name,
+          score: scoreNum,
+          createdAt: serverTimestamp()
+        });
+        count++;
+      }
     }
   });
 
-  if (count > 0) {
+  // 3. Batalkan jika ada error visual
+  if (hasError) {
+    alert("Terdapat nilai tidak valid (harus 0-100). Silakan periksa kolom berwarna merah.");
+    return; 
+  }
+
+  if (count === 0) {
+    return alert("Tidak ada nilai yang diisi.");
+  }
+
+  // 4. Proses Simpan ke Firestore
+  try {
+    // Aktifkan Loading State
+    btnSimpan.classList.add('btn-loading');
+    btnSimpan.disabled = true;
+    btnSimpan.innerHTML = `<span class="spinner"></span> Menyimpan...`;
+
     await batch.commit();
-    alert(`${count} nilai berhasil disimpan secara massal!`);
-    inputs.forEach(i => i.value = ''); // Reset form
+
+    alert(`${count} data nilai berhasil disimpan ke database!`);
+    
+    // Bersihkan semua input setelah berhasil
+    inputs.forEach(i => {
+      i.value = "";
+      i.style.border = "";
+      i.style.backgroundColor = "";
+    });
+
+  } catch (error) {
+    console.error("Error saat menyimpan:", error);
+    alert("Gagal menyimpan data. Periksa koneksi internet Anda.");
+  } finally {
+    // Kembalikan Tombol ke Semula
+    btnSimpan.classList.remove('btn-loading');
+    btnSimpan.disabled = false;
+    btnSimpan.innerHTML = originalText;
   }
 }
+
+
+async function hapusSemuaNilai() {
+  if (userRole !== 'ADMIN') {
+    alert("Akses Ditolak! Hanya Admin yang dapat menghapus seluruh data transaksi.");
+    return;
+  }
+  const konfirmasi = confirm("PERINGATAN: Anda akan menghapus SELURUH data nilai di database...");
+  if (!konfirmasi) return;
+
+  const password = prompt("Masukkan PIN ADMIN untuk konfirmasi penghapusan massal:");
+  if (password !== PIN_ADMIN) {
+    alert("PIN Salah. Penghapusan dibatalkan.");
+    return;
+  }
+
+  const batch = writeBatch(db);
+  const snap = await getDocs(nilaiCol);
+  snap.forEach(d => batch.delete(d.ref));
+  await batch.commit();
+  alert("Seluruh data nilai telah dibersihkan.");
+}
+
+// Fungsi untuk Edit Nilai Tunggal
+window.editSingleNilai = async (id, oldScore) => {
+  // Proteksi tambahan di sisi kode
+  if (userRole !== 'ADMIN') {
+    alert("Hanya Admin yang boleh mengedit nilai.");
+    return;
+  }
+
+  const newScore = prompt(`Ubah nilai santri. (Nilai lama: ${oldScore})`, oldScore);
+
+  // Jika user klik 'Cancel' atau tidak mengisi apapun
+  if (newScore === null || newScore.trim() === "") return;
+
+  const scoreNum = Number(newScore);
+
+  // Validasi input angka
+  if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 100) {
+    alert("Gagal: Masukkan angka yang valid antara 0 - 100.");
+    return;
+  }
+
+  try {
+    const docRef = doc(db, 'nilai', id);
+    await updateDoc(docRef, {
+      score: scoreNum,
+      updatedAt: serverTimestamp() // Mencatat kapan nilai terakhir diubah
+    });
+    // Tidak perlu refresh, onSnapshot akan otomatis memperbarui tabel
+  } catch (error) {
+    console.error("Gagal update:", error);
+    alert("Terjadi kesalahan saat menyimpan perubahan.");
+  }
+};
+
+// Pastikan fungsi hapus tunggal juga tersedia di window agar bisa diklik dari HTML
+window.deleteSingleNilai = async (id) => {
+  if (userRole !== 'ADMIN') return alert("Hanya Admin yang boleh menghapus.");
+  if (!confirm("Apakah Anda yakin ingin menghapus data nilai ini?")) return;
+  
+  try {
+    await deleteDoc(doc(db, 'nilai', id));
+  } catch (e) {
+    alert("Gagal menghapus data.");
+  }
+};
+
+
+window.exportToExcel = () => {
+  // 1. Ambil data yang sedang terfilter (dari cache data terakhir)
+  const dataToExport = window._latestTx || [];
+  
+  if (dataToExport.length === 0) {
+    alert("Tidak ada data untuk di-export.");
+    return;
+  }
+
+  // 2. Format data agar rapi di Excel
+  const excelData = dataToExport.map((d, index) => ({
+    "No": index + 1,
+    "Nama Santri": d.santriName,
+    "Mata Pelajaran": d.mapel,
+    "Guru Pengampu": d.guru || "-",
+    "Tipe Nilai": d.type,
+    "Skor": d.score,
+    "Tanggal Input": d.createdAt ? d.createdAt.toDate().toLocaleString('id-ID') : "-"
+  }));
+
+  // 3. Proses konversi menggunakan SheetJS
+  const worksheet = XLSX.utils.json_to_sheet(excelData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Rekap Nilai");
+
+  // 4. Atur lebar kolom otomatis (opsional)
+  const wscols = [
+    {wch: 5},  // No
+    {wch: 25}, // Nama
+    {wch: 20}, // Mapel
+    {wch: 20}, // Guru
+    {wch: 15}, // Tipe
+    {wch: 10}, // Skor
+    {wch: 20}  // Tanggal
+  ];
+  worksheet['!cols'] = wscols;
+
+  // 5. Download file
+  const fileName = `Rekap_Nilai_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(workbook, fileName);
+};
+
 
 function showInteractivePreview(type){
   const inputs = document.querySelectorAll('.input-score');
@@ -946,37 +1452,85 @@ if(!sheetName) return alert('Pilih sheet terlebih dahulu');
   });});
 
 document.getElementById('btnAddSantri').addEventListener('click', async () => {
-  const name  = document.getElementById('newSantriName').value.trim();
-  const kelas = document.getElementById('newSantriKelas').value.trim();
-  const nisn  = document.getElementById('newSantriNISN').value.trim();
+  const nameInput = document.getElementById('newSantriName');
+  const kelasInput = document.getElementById('newSantriKelas');
+  const nisnInput = document.getElementById('newSantriNISN');
 
-  if(!name) return alert('Nama santri wajib diisi');
+  const name = nameInput.value.trim();
+  const kelas = kelasInput.value.trim();
+  const nisn = nisnInput.value.trim();
 
-  // 🔒 Cegah NISN duplikat
-  if(nisn && santriCache.some(s => String(s.nisn || '').trim() === nisn)){
-    return alert('NISN sudah terdaftar');
+  if (!name) return alert('Nama santri wajib diisi!');
+
+  // Cek duplikat NISN lokal sebelum simpan
+  if (nisn && santriCache.some(s => s.nisn === nisn)) {
+    return alert('NISN sudah terdaftar!');
   }
 
-  try{
+  try {
     await addDoc(santriCol, {
-      name,
-      kelas,
-      nisn,
+      name: name,
+      kelas: kelas,
+      nisn: nisn,
       createdAt: serverTimestamp()
     });
-
-    document.getElementById('newSantriName').value = '';
-    document.getElementById('newSantriKelas').value = '';
-    document.getElementById('newSantriNISN').value = '';
-
     alert('Santri berhasil ditambahkan');
-  }catch(err){
-    console.error(err);
-    alert('Gagal menambahkan santri');
+    // Reset input
+    nameInput.value = '';
+    kelasInput.value = '';
+    nisnInput.value = '';
+  } catch (e) {
+    console.error("Error adding document: ", e);
   }
 });
 
+// Lanjutan di dalam fungsi renderSantriEditor
+  document.getElementById('btnAddSantri').onclick = async () => {
+    const name = document.getElementById('newSantriName').value.trim();
+    const kelas = document.getElementById('newSantriKelas').value.trim();
+    const nisn = document.getElementById('newSantriNISN').value.trim();
+    if (!name) return alert("Nama harus diisi");
+    
+    await addDoc(santriCol, { name, kelas, nisn, createdAt: serverTimestamp() });
+    alert("Santri berhasil ditambahkan!");
+  };
+
+  document.getElementById('btnDeleteSelected').onclick = async () => {
+    const checked = document.querySelectorAll('.chkSantri:checked');
+    if (!checked.length || !confirm(`Hapus ${checked.length} santri terpilih?`)) return;
+
+    const batch = writeBatch(db);
+    checked.forEach(cb => batch.delete(doc(db, 'santri', cb.dataset.id)));
+    await batch.commit();
+    alert("Data berhasil dihapus.");
+  };
+
+  // Event untuk Update Otomatis saat input diedit (Debounce dianjurkan untuk produksi)
+  document.querySelectorAll('.editableName').forEach(input => {
+    input.onchange = async (e) => {
+      const id = e.target.closest('tr').dataset.id;
+      await updateDoc(doc(db, 'santri', id), { name: e.target.value });
+    };
+  });
 }
+
+// Listener untuk Update Nama/Kelas/NISN secara Realtime
+document.querySelectorAll('#santriTable input').forEach(input => {
+  input.addEventListener('change', async (e) => {
+    const id = e.target.closest('tr').dataset.id;
+    const field = e.target.className === 'editableName' ? 'name' : 
+                  e.target.className === 'editableKelas' ? 'kelas' : 'nisn';
+    const value = e.target.value;
+
+    try {
+      await updateDoc(doc(db, 'santri', id), { [field]: value });
+      console.log("Data diperbarui");
+    } catch (err) {
+      alert("Gagal memperbarui: " + err.message);
+    }
+  });
+});
+
 
 async function previewExcelFile(){
   const fileInput = document.getElementById('excelInput');
@@ -999,6 +1553,7 @@ async function previewExcelFile(){
   };
   reader.readAsArrayBuffer(file);
 }
+
 
 async function importSantriExcel(){
   const fileInput = document.getElementById('excelInput');
@@ -1550,7 +2105,7 @@ rowsPerPageBox.innerHTML = `
 transactionsFilter.appendChild(rowsPerPageBox);
 
 // ==============PAGINATION STATE=========
-let currentPage = 1;
+
 let pageSize = 10;
 
 // Utility: change page (delta = +1 or -1)
@@ -1588,442 +2143,259 @@ function labelType(type){
   return type;
 }
 
-// Main render function: menerima daftar transaksi (snapshot mapped)
-function renderTransactionsWith(txList){
-  txList = txList || [];
-  const mapelSelect = document.getElementById('filterMapel');
-  const santriSelect = document.getElementById('filterSantri');
-  const typeSelect = document.getElementById('filterType');
 
-  // simpan prev
-  const selectedType = typeSelect?.value || '';
-  const selectedMapel = mapelSelect?.value || '';
-  const selectedSantri = santriSelect?.value || '';
+// Variabel Global untuk Pagination
+function renderFilterBar() {
+  const filterContainer = document.getElementById('transactionsFilter');
+  if (!filterContainer) return;
 
-  // sync dropdowns
-  if(mapelSelect && mapelCache.length){
-    mapelSelect.innerHTML = '<option value="">Semua Mapel</option>' + mapelCache.map(m=>`<option value="${m.name}">${m.name}</option>`).join('');
-    mapelSelect.value = selectedMapel;
-  }
-  if(santriSelect && santriCache.length){
-    santriSelect.innerHTML = '<option value="">Semua Santri</option>' + santriCache.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
-    santriSelect.value = selectedSantri;
-  }
-  if(typeSelect) typeSelect.value = selectedType;
+  filterContainer.innerHTML = `
+    <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+      <input type="text" id="filterSearch" placeholder="Cari Nama Santri..." 
+        style="padding:8px; border-radius:8px; border:1px solid #ccc; flex:1;">
+      
+      <select id="filterType" style="padding:8px; border-radius:8px; border:1px solid #ccc;">
+        <option value="">Semua Tipe</option>
+        <option value="UH">UH</option>
+        <option value="PTS">PTS</option>
+        <option value="PAS_LISAN">PAS Lisan</option>
+        <option value="PAS_TULIS">PAS Tulis</option>
+        <option value="PAS_PRAKTEK">PAS Praktek</option>
+      </select>
 
-  const fType = (typeSelect?.value || '').trim();
-  const fMapel = (mapelSelect?.value || '').trim();
-  const fSantri = (santriSelect?.value || '').trim();
+      <button class="btn small delete-all" id="btnHapusSemua">Hapus Semua Data</button>
+    </div>
+  `;
 
-  // filter berdasarkan dropdowns
-  const arr = txList.filter(t => {
-    const matchType = !fType || t.type === fType;
-    const matchMapel = !fMapel || t.mapel === fMapel;
-    const matchSantri = !fSantri || t.santriId === fSantri;
-    return matchType && matchMapel && matchSantri;
+  // Tambahkan event listener untuk pencarian otomatis
+  document.getElementById('filterSearch').addEventListener('input', () => {
+    renderTransactionsWith(window._latestTx || []);
   });
 
-  // jika kosong setelah filter
-  if(!arr.length){
-    transactionsPanel.innerHTML = '<div style="padding:12px;color:var(--muted)">Tidak ada transaksi sesuai filter.</div>';
-    return;
-  }
+  document.getElementById('filterType').addEventListener('change', () => {
+    renderTransactionsWith(window._latestTx || []);
+  });
 
-  // PAGINATION
-  const totalItems = arr.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  if(currentPage > totalPages) currentPage = totalPages;
-  const start = (currentPage - 1) * pageSize;
-  const paginated = arr.slice(start, start + pageSize);
-
-  // Render tabel (versi lama, mobile-friendly)
-  transactionsPanel.innerHTML = `<table>
-    <thead><tr><th>No</th><th>Tipe</th><th>Mapel</th><th>Santri</th><th>Nilai</th><th>Waktu</th><th>Aksi</th></tr></thead>
-    <tbody>
-      ${paginated.map((t,i)=>`<tr>
-        <td data-label="No">${start + i + 1}</td>
-        <td data-label="Tipe">${escapeHtml(t.type)}</td>
-        <td data-label="Mapel">${escapeHtml(t.mapel)}</td>
-        <td data-label="Santri">${escapeHtml(t.santriName)}</td>
-        <td data-label="Nilai">${t.score}</td>
-        <td data-label="Waktu">${fmtDate(t.createdAt)}</td>
-        <td data-label="Aksi" class="actions">
-          <button class="btnEditTx" data-id="${t.id}">Edit</button>
-          <button class="btnDelTx" data-id="${t.id}">Hapus</button>
-        </td>
-      </tr>`).join('')}
-    </tbody>
-  </table>
-
-  <div style="margin-top:10px; display:flex; justify-content:center; gap:8px; align-items:center;">
-    <button class="btn small ghost" id="prevPageBtn" ${currentPage===1?'disabled':''}>← Prev</button>
-    <span>Halaman ${currentPage} dari ${totalPages} — Total: ${totalItems}</span>
-    <button class="btn small ghost" id="nextPageBtn" ${currentPage===totalPages?'disabled':''}>Next →</button>
-  </div>`;
-
-  // attach events for edit & delete (these call global functions)
-  document.querySelectorAll('.btnDelTx').forEach(b=>b.addEventListener('click', async e=>{
-    const id = e.currentTarget.dataset.id;
-    await window.deleteTransaksi(id);
-  }));
-
-  document.querySelectorAll('.btnEditTx').forEach(b=>b.addEventListener('click', async e=>{
-    const id = e.currentTarget.dataset.id;
-    await window.editTransaksi(id);
-  }));
-
-  // page buttons
-  document.getElementById('prevPageBtn').addEventListener('click', ()=> changePage(-1));
-  document.getElementById('nextPageBtn').addEventListener('click', ()=> changePage(1));
+  // Logika Hapus Semua (Hanya Admin)
+  document.getElementById('btnHapusSemua').onclick = async () => {
+    if (confirm('PERINGATAN: Hapus SEMUA data nilai secara permanen?')) {
+      const batch = writeBatch(db);
+      const snap = await getDocs(nilaiCol);
+      snap.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      alert('Semua data berhasil dihapus.');
+    }
+  };
 }
-
-// FILTER EVENTS
-['filterType','filterMapel','filterSantri'].forEach(id=>{
-  const el = document.getElementById(id);
-  if(el){
-    el.addEventListener('change', ()=>{
-      currentPage = 1; // reset ke halaman 1 saat filter berubah
-      renderTransactionsWith(window._latestTx || []);
-    });
-  }
-});
-
-
-document.getElementById("rowsPerPage").addEventListener("change", (e) => {
-  pageSize = parseInt(e.target.value);
-  currentPage = 1;
-  renderTransactionsWith(window._latestTx || []);
-});
-
-// EXPORT CSV berdasarkan filter aktif (export seluruh hasil filter, bukan hanya halaman)
-document.getElementById('btnExport').addEventListener('click', ()=>{
-  const fType = document.getElementById('filterType')?.value || '';
-  const fMapel = document.getElementById('filterMapel')?.value || '';
-  const fSantri = document.getElementById('filterSantri')?.value || '';
-
-  const tx = (window._latestTx||[]).filter(t =>
-    (!fType || t.type === fType) &&
-    (!fMapel || t.mapel === fMapel) &&
-    (!fSantri || t.santriId === fSantri)
-  );
-
-  if(!tx.length) return alert('Tidak ada data untuk diexport.');
-
-  const csvRows = ['Tipe,Mapel,Santri,Nilai,Timestamp'];
-  tx.forEach(t=>{
-    const ts = t.createdAt && t.createdAt.toDate ? t.createdAt.toDate().toISOString() : '';
-    const mapel = `"${(t.mapel||'').replace(/"/g,'""')}"`;
-    const santriName = `"${(t.santriName||'').replace(/"/g,'""')}"`;
-    csvRows.push(`${t.type},${mapel},${santriName},${t.score},${ts}`);
-  });
-
-  const blob = new Blob([csvRows.join('\n')], {type:'text/csv'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'transaksi_nilai_filtered.csv'; a.click();
-  URL.revokeObjectURL(url);
-});
 
 
 // ====== DAFTAR GURU =====
-function renderGuruEditor(){
+function renderGuruEditor() {
+  // Ambil opsi mapel dari cache untuk dropdown guru
+  const mapelOptions = mapelCache.length 
+    ? mapelCache.map(m => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`).join('')
+    : '<option value="">-- Isi Daftar Mapel Terlebih Dahulu --</option>';
 
-  // ===============================
-  // HTML
-  // ===============================
   mainPanel.innerHTML = `
-    <h3>DAFTAR GURU</h3>
+    <h3>MANAJEMEN DAFTAR GURU</h3>
 
-    <input type="file" id="fileGuru" accept=".xlsx,.csv" style="margin-bottom:8px;" />
-    <button class="btn small" id="btnImportGuru">Import Excel</button>
+    <div style="background: #f1f5f9; padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px dashed #cbd5e1;">
+      <label style="font-weight:bold; color:var(--primary-dark);">Import Guru (Excel)</label>
+      <input type="file" id="fileGuru" accept=".xlsx,.csv" style="display:block; margin: 10px 0;" />
+      <div style="display:flex; gap:8px;">
+        <button class="btn small" id="btnImportGuru">1. Baca File</button>
+        <select id="sheetSelectorGuru" disabled style="flex:1;">
+          <option value="">2. Pilih Sheet</option>
+        </select>
+      </div>
+      <p style="font-size:11px; color:var(--muted); margin-top:8px;">Format Kolom: <b>Nama, NIP, Mapel</b></p>
+    </div>
 
-    <label>Pilih Sheet</label>
-    <select id="sheetSelectorGuru" disabled style="margin-bottom:8px;">
-      <option value="">-- Pilih Sheet --</option>
-    </select>
+    <div class="card" style="padding:15px; border:1px solid #e2e8f0; margin-bottom:20px;">
+      <label style="font-weight:bold;">Tambah Guru Secara Manual</label>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:8px;">
+        <input type="text" id="guruName" placeholder="Nama Lengkap" style="width:100%" />
+        <input type="text" id="guruNip" placeholder="NIP/NIY (Opsional)" style="width:100%" />
+      </div>
+      <select id="guruMapel" style="width:100%; margin:10px 0;">
+        <option value="">-- Pilih Mapel Pengampu --</option>
+        ${mapelOptions}
+      </select>
+      <button class="btn" id="btnAddGuru" style="width:100%">Tambah Guru</button>
+    </div>
 
-    <hr>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <button class="btn small delete-all" id="btnDeleteSelectedGuru">Hapus Terpilih</button>
+      <span class="badge">${guruCache.length} Guru Terdaftar</span>
+    </div>
 
-    <input id="guruName" placeholder="Nama Guru" />
-    <input id="guruNip" placeholder="NIP" />
-    <select id="guruMapel">
-    <option value="">-- Pilih Mapel --</option>
-    </select>
-    <button class="btn" id="btnAddGuru" disabled>Tambah Guru</button>
-
-    <hr>
-
-    <button class="btn danger small" id="btnDeleteSelected">
-      Hapus Terpilih
-    </button>
-
-    <table class="table">
-      <thead>
-        <tr>
-          <th>
-            <input type="checkbox" id="checkAllGuru">
-          </th>
-          <th>Nama</th>
-          <th>NIP</th>
-          <th>Mapel</th>
-          <th>Aksi</th>
-        </tr>
-      </thead>
-      <tbody id="guruTable"></tbody>
-    </table>
+    <div class="table-responsive">
+      <table style="width:100%; background:#fff;">
+        <thead>
+          <tr>
+            <th width="40"><input type="checkbox" id="checkAllGuru"></th>
+            <th>Nama Guru</th>
+            <th>NIP</th>
+            <th>Mapel diampu</th>
+            <th width="80">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="guruTableBody">
+          ${guruCache.map(g => `
+            <tr>
+              <td><input type="checkbox" class="checkGuru" data-id="${g.id}"></td>
+              <td><b>${escapeHtml(g.name)}</b></td>
+              <td>${escapeHtml(g.nip || '-')}</td>
+              <td><span class="badge" style="background:var(--primary-soft); color:var(--primary-dark);">${escapeHtml(g.mapel || '-')}</span></td>
+              <td>
+                <button class="btn small delete" onclick="window.deleteGuru('${g.id}')">Hapus</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
   `;
 
-  // ===============================
-  // AMBIL DOM
-  // ===============================
-  const fileGuru = document.getElementById('fileGuru');
-  const btnImportGuru = document.getElementById('btnImportGuru');
-  const sheetSelectorGuru = document.getElementById('sheetSelectorGuru');
-  const guruTable = document.getElementById('guruTable');
-  const guruName = document.getElementById('guruName');
-  const guruNip = document.getElementById('guruNip');
-  const guruMapel = document.getElementById('guruMapel');
-  const btnAddGuru = document.getElementById('btnAddGuru');
-  const btnDeleteSelected = document.getElementById('btnDeleteSelected');
-  const checkAllGuru = document.getElementById('checkAllGuru');
+  // --- LOGIKA EVENT LISTENERS ---
 
-  // ===============================
-  // STATE
-  // ===============================
-  let guruWorkbook = null;
+  // 1. Tambah Guru Manual
+  document.getElementById('btnAddGuru').onclick = async () => {
+    const btn = document.getElementById('btnAddGuru');
+    const name = document.getElementById('guruName').value.trim();
+    const nip = document.getElementById('guruNip').value.trim();
+    const mapel = document.getElementById('guruMapel').value;
 
-  // ===============================
-  // RENDER TABLE
-  // ===============================
-  function renderTable(){
-    guruTable.innerHTML = '';
+    if (!name || !mapel) return alert("Nama dan Mapel wajib diisi!");
 
-    guruCache.forEach(g=>{
-      guruTable.innerHTML += `
-        <tr>
-          <td>
-            <input type="checkbox" class="check-guru" value="${g.id}">
-          </td>
-          <td>${g.name}</td>
-          <td>${g.nip || '-'}</td>
-          <td>${g.mapel || '-'}</td>
-          <td>
-            <button class="btn small" data-edit="${g.id}">Edit</button>
-            <button class="btn small danger" data-del="${g.id}">Hapus</button>
-          </td>
-        </tr>
-      `;
-    });
-  }
-  renderTable(); 
+    btn.disabled = true;
+    btn.innerHTML = "Menyimpan...";
 
-function renderMapelOptions(){
-  guruMapel.innerHTML = '<option value="">-- Pilih Mapel --</option>';
-
-  mapelCache.forEach(m=>{
-    guruMapel.innerHTML += `
-      <option value="${m.name}">
-        ${m.name}
-      </option>
-    `;
-  });
-}
-renderMapelOptions();
-
-function cekFormGuru(){
-  const name = guruName.value.trim();
-  const mapel = guruMapel.value;
-
-  btnAddGuru.disabled = !(name && mapel);
-}
-
-// pantau perubahan
-guruName.addEventListener('input', cekFormGuru);
-guruMapel.addEventListener('change', cekFormGuru);
-
-  // ===============================
-  // CHECK ALL
-  // ===============================
-  checkAllGuru.addEventListener('change', ()=>{
-    document.querySelectorAll('.check-guru')
-      .forEach(cb => cb.checked = checkAllGuru.checked);
-  });
-
-  // ===============================
-  // HAPUS MASSAL
-  // ===============================
-  btnDeleteSelected.addEventListener('click', async ()=>{
-    const checked = [...document.querySelectorAll('.check-guru:checked')];
-
-    if(!checked.length)
-      return alert('Pilih data yang akan dihapus');
-
-    if(!confirm(`Hapus ${checked.length} data guru?`))
-      return;
-
-    const batch = writeBatch(db);
-
-    checked.forEach(cb=>{
-      batch.delete(doc(guruCol, cb.value));
-    });
-
-    await batch.commit();
-    alert('Data terpilih berhasil dihapus');
-  });
-
-  // ===============================
-  // TAMBAH MANUAL
-  // ===============================
-btnAddGuru.addEventListener('click', async ()=>{
-  const name  = guruName.value.trim();
-  const nip   = guruNip.value.trim();
-  const mapel = guruMapel.value;
-
-  if(!name)
-    return alert('Nama guru wajib diisi');
-
-  if(!mapel)
-    return alert('Mapel wajib dipilih');
-
-  if(nip && guruCache.some(g=>g.nip === nip))
-    return alert('NIP sudah ada');
-
-  await addDoc(guruCol,{
-    name,
-    nip,
-    mapel,
-    createdAt: serverTimestamp()
-  });
-
-  guruName.value = '';
-  guruNip.value  = '';
-  guruMapel.value = '';
-
-  btnAddGuru.disabled = true;
-});
-
-
-  // ===============================
-  // EDIT & HAPUS SATUAN
-  // ===============================
-  guruTable.addEventListener('click', async (e)=>{
-    const delId = e.target.dataset.del;
-    const editId = e.target.dataset.edit;
-
-    if(delId){
-      if(!confirm('Hapus guru ini?')) return;
-      await deleteDoc(doc(guruCol, delId));
-    }
-
-    if(editId){
-      const g = guruCache.find(x=>x.id === editId);
-      if(!g) return;
-
-      const name = prompt('Nama Guru', g.name);
-      if(!name) return;
-
-      const nip = prompt('NIP', g.nip || '');
-      if(nip && guruCache.some(x=>x.nip === nip && x.id !== g.id))
-        return alert('NIP sudah digunakan');
-
-      let mapel = g.mapel || '';
-const pilihan = mapelCache.map(m=>m.name).join(', ');
-
-const input = prompt(
-  `Mapel (pilih salah satu):\n${pilihan}`,
-  mapel
-);
-
-if(input && !mapelCache.some(m=>m.name === input))
-  return alert('Mapel tidak terdaftar');
-
-mapel = input;
-
-
-      await updateDoc(doc(guruCol, g.id),{
+    try {
+      await addDoc(guruCol, {
         name,
         nip,
-        mapel
-      });
-    }
-  });
-
-  // ===============================
-  // IMPORT EXCEL
-  // ===============================
-  fileGuru.addEventListener('change', async (e)=>{
-    const file = e.target.files[0];
-    if(!file) return;
-
-    const data = await file.arrayBuffer();
-    guruWorkbook = XLSX.read(data);
-
-    sheetSelectorGuru.innerHTML =
-      '<option value="">-- Pilih Sheet --</option>';
-
-    guruWorkbook.SheetNames.forEach(s=>{
-      sheetSelectorGuru.innerHTML +=
-        `<option value="${s}">${s}</option>`;
-    });
-
-    sheetSelectorGuru.disabled = false;
-  });
-
-  btnImportGuru.addEventListener('click', async ()=>{
-    if(!guruWorkbook) return alert('Pilih file Excel dulu');
-    if(!sheetSelectorGuru.value) return alert('Pilih sheet');
-
-    const ws = guruWorkbook.Sheets[sheetSelectorGuru.value];
-    const rows = XLSX.utils.sheet_to_json(ws,{
-      header:['name','nip','mapel'],
-      range:1
-    });
-
-    const existingNip = guruCache.map(g=>String(g.nip||''));
-    const batch = writeBatch(db);
-
-    let added = 0;
-    let skipped = 0;
-
-    rows.forEach(r=>{
-      if(!r.name) return;
-
-      const nip = String(r.nip||'').trim();
-
-      if(nip && existingNip.includes(nip)){
-        skipped++; return;
-      }
-
-      batch.set(doc(guruCol),{
-        name: String(r.name).trim(),
-        nip,
-        mapel: r.mapel || '',
+        mapel,
         createdAt: serverTimestamp()
       });
+      // Reset Form
+      document.getElementById('guruName').value = "";
+      document.getElementById('guruNip').value = "";
+      document.getElementById('guruMapel').value = "";
+      alert("Guru berhasil ditambahkan!");
+    } catch (e) {
+      alert("Gagal menambah data.");
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = "Tambah Guru";
+    }
+  };
 
-      added++;
+  // 2. Logika Import Excel
+  let workbookGuru;
+  document.getElementById('btnImportGuru').onclick = () => {
+    const fileInput = document.getElementById('fileGuru');
+    if (!fileInput.files[0]) return alert("Pilih file Excel dulu!");
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const data = new Uint8Array(e.target.result);
+      workbookGuru = XLSX.read(data, { type: 'array' });
+      const selector = document.getElementById('sheetSelectorGuru');
+      
+      selector.innerHTML = '<option value="">-- Pilih Sheet --</option>' + 
+        workbookGuru.SheetNames.map(s => `<option value="${s}">${s}</option>`).join('');
+      selector.disabled = false;
+      alert("File terbaca. Silakan pilih sheet untuk eksekusi import.");
+    };
+    reader.readAsArrayBuffer(fileInput.files[0]);
+  };
+
+  // 3. Eksekusi Import dari Sheet
+  document.getElementById('sheetSelectorGuru').onchange = async (e) => {
+    const sheetName = e.target.value;
+    if (!sheetName) return;
+
+    if (!confirm(`Import data dari sheet "${sheetName}"?`)) return;
+
+    const worksheet = workbookGuru.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+    const batch = writeBatch(db);
+
+    jsonData.forEach(row => {
+      const newRef = doc(guruCol);
+      batch.set(newRef, {
+        name: row.Nama || row.nama || '',
+        nip: String(row.NIP || row.nip || ''),
+        mapel: row.Mapel || row.mapel || '',
+        createdAt: serverTimestamp()
+      });
     });
 
-    if(!added)
-      return alert(`Tidak ada data baru\nDuplikat: ${skipped}`);
+    try {
+      await batch.commit();
+      alert(`Berhasil mengimpor ${jsonData.length} data guru.`);
+      document.getElementById('fileGuru').value = "";
+      e.target.disabled = true;
+    } catch (err) {
+      alert("Terjadi kesalahan saat batch import.");
+    }
+  };
 
-    await batch.commit();
-    alert(`Import selesai\nDitambah: ${added}\nDuplikat: ${skipped}`);
+  // 4. Fitur Checkbox Select All
+  document.getElementById('checkAllGuru').onclick = (e) => {
+    document.querySelectorAll('.checkGuru').forEach(cb => cb.checked = e.target.checked);
+  };
 
-    fileGuru.value = '';
-  });
+  // 5. Hapus Massal Guru
+  document.getElementById('btnDeleteSelectedGuru').onclick = async () => {
+    const selected = document.querySelectorAll('.checkGuru:checked');
+    if (selected.length === 0) return alert("Pilih guru yang ingin dihapus.");
+
+    if (confirm(`Hapus ${selected.length} guru terpilih secara permanen?`)) {
+      const batch = writeBatch(db);
+      selected.forEach(cb => {
+        batch.delete(doc(db, 'guru', cb.dataset.id));
+      });
+      await batch.commit();
+      alert("Data terpilih berhasil dihapus.");
+    }
+  };
 }
 
-// ====== AUTH SISTEM PIN ======
+// Ekspos fungsi delete tunggal ke scope window
+window.deleteGuru = async (id) => {
+  if (confirm("Hapus data guru ini secara permanen?")) {
+    try {
+      await deleteDoc(doc(db, 'guru', id));
+    } catch (e) {
+      alert("Gagal menghapus data.");
+    }
+  }
+};
+
+
+// ====== AUTH SISTEM PIN (VERSI PERBAIKAN) ======
 function checkPin() {
     const userPin = prompt("Masukkan PIN Akses:");
-    if (userPin === PIN_RAHASIA) {
+    
+    if (userPin === PIN_ADMIN) {
         isAuthorized = true;
-        alert("Akses Diterima!");
-        updateUIStatus();
-        renderActiveTab(); // Render ulang tab setelah login
+        userRole = 'ADMIN';
+        activeTab = 'DAFTAR_SANTRI'; // Admin langsung ke menu manajemen
+        alert("Login berhasil sebagai ADMIN");
+    } else if (userPin === PIN_USER) {
+        isAuthorized = true;
+        userRole = 'USER';
+        activeTab = 'UH'; // User biasa langsung ke menu input
+        alert("Login berhasil sebagai PENGINPUT");
     } else {
         alert("PIN Salah!");
+        return; // Keluar jika salah
     }
+    
+    // Update tampilan setelah login sukses
+    renderActiveTab();
 }
 
 function updateUIStatus() {
@@ -2033,12 +2405,36 @@ function updateUIStatus() {
     btnLogin.onclick = isAuthorized ? () => { isAuthorized = false; updateUIStatus(); renderActiveTab(); } : checkPin;
 }
 
+
+// Tambahkan ini di fungsi logout Anda
+function logout() {
+  isAuthorized = false;
+  userRole = null;
+  document.body.classList.remove('role-user'); // Menghapus mode user
+  renderActiveTab();
+}
+
+// Tambahkan event ke tombol logout jika ada di HTML
+if(btnLogout) {
+  btnLogout.style.display = 'block'; // Munculkan tombol logout
+  btnLogout.onclick = logout;
+}
+
+
+window.onbeforeunload = function() {
+  if (document.querySelectorAll('.input-score').some(i => i.value !== "")) {
+    return "Data belum disimpan, yakin ingin keluar?";
+  }
+};
+
+
 // Inisialisasi awal tombol login
 btnLogin.onclick = checkPin;
 btnLogout.style.display = 'none'; // Sembunyikan tombol logout bawaan lama
 // initial render
 renderActiveTab();
 renderTransactionsWith(window._latestTx||[]);
+
 </script>
 
 </body>
